@@ -8,47 +8,38 @@ router = APIRouter()
 
 @router.post("/")
 async def predict_match(
-    fixture_id: int = Query(..., description="경기 ID"),
-    home_team_id: int = Query(..., description="홈팀 ID"),
-    away_team_id: int = Query(..., description="원정팀 ID"),
+    fixture_id: int = Query(...),
+    home_team_id: int = Query(...),
+    away_team_id: int = Query(...),
 ):
-    """
-    Monte Carlo Poisson 시뮬레이션으로 경기 결과를 예측합니다.
-    10,000번 시뮬레이션을 실행하여 승/무/패 확률과 예측 점수를 반환합니다.
-    """
+    """Monte Carlo Poisson 시뮬레이션으로 경기 결과 예측"""
     cache_key = f"prediction:{fixture_id}"
     cached = cache.get(cache_key)
     if cached is not None:
         return {**cached, "cached": True}
 
     try:
-        # 4개 API 호출을 동시에 실행 (API 할당량 최적화)
-        home_recent, away_recent, home_stats_data, away_stats_data = await asyncio.gather(
-            football_api.get_recent_fixtures(home_team_id),
-            football_api.get_recent_fixtures(away_team_id),
-            football_api.get_team_stats(home_team_id),
-            football_api.get_team_stats(away_team_id),
+        # 3개 비동기 호출 동시 실행
+        home_matches, away_matches, standings = await asyncio.gather(
+            football_api.get_recent_team_matches(home_team_id),
+            football_api.get_recent_team_matches(away_team_id),
+            football_api.get_standings(),
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"데이터 수집 실패: {str(e)}")
 
     # 피로도 계산
-    home_fatigue_mod = fatigue.calculate_fatigue_modifier(
-        home_recent.get("response", []), home_team_id
-    )
-    away_fatigue_mod = fatigue.calculate_fatigue_modifier(
-        away_recent.get("response", []), away_team_id
-    )
+    home_fatigue_mod = fatigue.calculate_fatigue_modifier(home_matches, home_team_id)
+    away_fatigue_mod = fatigue.calculate_fatigue_modifier(away_matches, away_team_id)
 
-    # 팀 스탯 추출 (공격력, 수비 취약성, 폼)
+    # 팀 스탯 (순위표 + 최근 경기)
     home_att, home_def, home_form = team_stats.extract_stats(
-        home_stats_data, home_recent
+        home_team_id, standings, home_matches
     )
     away_att, away_def, away_form = team_stats.extract_stats(
-        away_stats_data, away_recent
+        away_team_id, standings, away_matches
     )
 
-    # Monte Carlo 시뮬레이션 실행
     sim_result = simulation.run_simulation(
         home_attack=home_att,
         home_defense=home_def,
@@ -60,7 +51,6 @@ async def predict_match(
         away_form=away_form,
     )
 
-    # 피로도 레이블 추가
     result = {
         **sim_result,
         "fatigue": {
@@ -74,19 +64,11 @@ async def predict_match(
             },
         },
         "team_stats": {
-            "home": {
-                "attack": home_att,
-                "defense_weakness": home_def,
-                "form": home_form,
-            },
-            "away": {
-                "attack": away_att,
-                "defense_weakness": away_def,
-                "form": away_form,
-            },
+            "home": {"attack": home_att, "defense_weakness": home_def, "form": home_form},
+            "away": {"attack": away_att, "defense_weakness": away_def, "form": away_form},
         },
         "cached": False,
     }
 
-    cache.set(cache_key, result, ttl_seconds=900)  # 15분 캐시
+    cache.set(cache_key, result, ttl_seconds=900)
     return result
