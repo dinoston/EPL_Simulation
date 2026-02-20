@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+venv/
+.venv/
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+build/
+*.tgz
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+*.pem
+
+# Env files (API 키 보호)
+.env
+.env.local
+.env.*.local
+
+# EAS
+eas-build-pre-install.sh
