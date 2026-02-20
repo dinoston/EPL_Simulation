@@ -6,6 +6,7 @@ import type { Fixture } from '../types/fixture';
 interface Props {
   fixture: Fixture;
   onPress: () => void;
+  onSimulationPress: () => void;
 }
 
 function formatKickoffTime(dateStr: string): string {
@@ -40,14 +41,14 @@ function getStatusBadge(status: string): { label: string; color: string } {
   }
 }
 
-export function FixtureCard({ fixture, onPress }: Props) {
+export function FixtureCard({ fixture, onPress, onSimulationPress }: Props) {
   const kickoff = formatKickoffTime(fixture.date);
   const dateLabel = formatDate(fixture.date);
   const badge = getStatusBadge(fixture.status);
   const isScheduled = fixture.status === 'NS';
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.75}>
+    <View style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.dateText}>{dateLabel}</Text>
         <View style={[styles.badge, { backgroundColor: badge.color + '22' }]}>
@@ -85,11 +86,16 @@ export function FixtureCard({ fixture, onPress }: Props) {
       </View>
 
       {isScheduled && (
-        <View style={styles.predictBtn}>
-          <Text style={styles.predictBtnText}>AI 예측 보기 →</Text>
+        <View style={styles.btnRow}>
+          <TouchableOpacity style={styles.simBtn} onPress={onSimulationPress}>
+            <Text style={styles.simBtnText}>▶ 시뮬레이션</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.predictBtn} onPress={onPress}>
+            <Text style={styles.predictBtnText}>AI 예측 분석</Text>
+          </TouchableOpacity>
         </View>
       )}
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -167,8 +173,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
   },
-  predictBtn: {
+  btnRow: {
+    flexDirection: 'row',
     marginTop: 12,
+    gap: 8,
+  },
+  simBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: COLORS.accent + '22',
+    borderWidth: 1,
+    borderColor: COLORS.accent + '44',
+  },
+  simBtnText: {
+    color: COLORS.accent,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  predictBtn: {
+    flex: 1,
     alignItems: 'center',
     paddingVertical: 8,
     borderRadius: 8,

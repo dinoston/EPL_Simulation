@@ -30,6 +30,14 @@ export interface TopScorelinesItem {
   probability: number;
 }
 
+export interface MatchEvent {
+  minute: number;
+  team: 'home' | 'away';
+  type: string;
+  home_score: number;
+  away_score: number;
+}
+
 export interface PredictionResponse {
   predicted_score: PredictedScore;
   probabilities: Probabilities;
@@ -43,6 +51,7 @@ export interface PredictionResponse {
     away: TeamStats;
   };
   top_scorelines: TopScorelinesItem[];
+  match_events: MatchEvent[];
   confidence: number;
   simulations: number;
   cached: boolean;

@@ -81,6 +81,11 @@ def run_simulation(
         for (h, a), count in scorelines.most_common(5)
     ]
 
+    # 예측 스코어에 대한 경기 이벤트 생성 (득점 분, 반전 등)
+    match_events = generate_match_events(
+        int(predicted_home), int(predicted_away), rng
+    )
+
     return {
         "predicted_score": {
             "home": int(predicted_home),
@@ -96,6 +101,85 @@ def run_simulation(
             "away": round(float(away_xG), 2),
         },
         "top_scorelines": top_scorelines,
+        "match_events": match_events,
         "confidence": confidence,
         "simulations": SIMULATIONS,
     }
+
+
+def generate_match_events(
+    home_goals: int,
+    away_goals: int,
+    rng: np.random.Generator,
+) -> list[dict]:
+    """
+    예측 스코어를 바탕으로 경기 이벤트(득점 분)를 생성합니다.
+
+    실제 EPL 통계 기반:
+    - 전반전(1~45분): 전체 골의 약 44%
+    - 후반전(46~90분): 전체 골의 약 56%
+    - 후반전 막판(75~90분) 역전골 비율 높음
+    """
+    events: list[dict] = []
+
+    total_goals = home_goals + away_goals
+    if total_goals == 0:
+        return []
+
+    # 각 골이 전/후반에 터질 확률 (후반이 약간 높음)
+    all_minutes: list[int] = []
+    for _ in range(total_goals):
+        if rng.random() < 0.44:
+            # 전반전: 1~45분, 후반 막판 집중 피하기
+            minute = int(rng.integers(3, 45))
+        else:
+            # 후반전: 46~90분, 막판(76~90)에 가중치
+            if rng.random() < 0.30:
+                minute = int(rng.integers(76, 91))
+            else:
+                minute = int(rng.integers(46, 76))
+        all_minutes.append(minute)
+
+    all_minutes.sort()
+
+    # 홈팀 골 분배 (랜덤으로 어떤 분에 넣을지)
+    goal_minutes = all_minutes.copy()
+    home_minute_indices = sorted(
+        rng.choice(len(goal_minutes), size=home_goals, replace=False).tolist()
+    ) if home_goals > 0 else []
+    away_minute_indices = [i for i in range(len(goal_minutes)) if i not in home_minute_indices]
+
+    home_score = 0
+    away_score = 0
+    assigned: list[tuple[int, str]] = []
+
+    for i, minute in enumerate(goal_minutes):
+        if i in home_minute_indices:
+            home_score += 1
+            team = "home"
+        else:
+            away_score += 1
+            team = "away"
+        assigned.append((minute, team))
+
+    # 이벤트 목록 생성
+    for minute, team in assigned:
+        events.append({
+            "minute": minute,
+            "team": team,
+            "type": "goal",
+            "home_score": home_score if team == "home" else (home_score - (1 if team == "away" else 0)),
+            "away_score": away_score if team == "away" else (away_score - (1 if team == "home" else 0)),
+        })
+
+    # 득점 후 누적 스코어 재계산
+    h, a = 0, 0
+    for ev in events:
+        if ev["team"] == "home":
+            h += 1
+        else:
+            a += 1
+        ev["home_score"] = h
+        ev["away_score"] = a
+
+    return events

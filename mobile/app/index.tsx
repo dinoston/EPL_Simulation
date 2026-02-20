@@ -19,20 +19,23 @@ export default function HomeScreen() {
   const { fixtures, loading, error, date, refetch } = useFixtures();
   const router = useRouter();
 
+  const sharedParams = (fixture: Fixture) => ({
+    fixtureId: String(fixture.id),
+    homeTeamId: String(fixture.home.id),
+    awayTeamId: String(fixture.away.id),
+    homeName: fixture.home.name,
+    awayName: fixture.away.name,
+    homeLogo: fixture.home.logo,
+    awayLogo: fixture.away.logo,
+    kickoff: fixture.date,
+  });
+
   function handleFixturePress(fixture: Fixture) {
-    router.push({
-      pathname: '/prediction/[fixtureId]',
-      params: {
-        fixtureId: String(fixture.id),
-        homeTeamId: String(fixture.home.id),
-        awayTeamId: String(fixture.away.id),
-        homeName: fixture.home.name,
-        awayName: fixture.away.name,
-        homeLogo: fixture.home.logo,
-        awayLogo: fixture.away.logo,
-        kickoff: fixture.date,
-      },
-    });
+    router.push({ pathname: '/prediction/[fixtureId]', params: sharedParams(fixture) });
+  }
+
+  function handleSimulationPress(fixture: Fixture) {
+    router.push({ pathname: '/simulation/[fixtureId]', params: sharedParams(fixture) });
   }
 
   if (loading && fixtures.length === 0) {
@@ -62,7 +65,11 @@ export default function HomeScreen() {
         data={fixtures}
         keyExtractor={(item) => String(item.id)}
         renderItem={({ item }) => (
-          <FixtureCard fixture={item} onPress={() => handleFixturePress(item)} />
+          <FixtureCard
+            fixture={item}
+            onPress={() => handleFixturePress(item)}
+            onSimulationPress={() => handleSimulationPress(item)}
+          />
         )}
         refreshControl={
           <RefreshControl

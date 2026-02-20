@@ -22,6 +22,13 @@ export default function RootLayout() {
           name="prediction/[fixtureId]"
           options={{ title: '경기 예측' }}
         />
+        <Stack.Screen
+          name="simulation/[fixtureId]"
+          options={{
+            title: '경기 시뮬레이션',
+            headerStyle: { backgroundColor: '#0d2e0a' },
+          }}
+        />
       </Stack>
     </>
   );
