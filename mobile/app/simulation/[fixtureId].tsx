@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePrediction } from '../../hooks/usePrediction';
@@ -14,6 +15,7 @@ import { useAdMob } from '../../hooks/useAdMob';
 import { useUserStats } from '../../hooks/useUserStats';
 import { getLevel, LEVEL_ICONS } from '../../types/user';
 import { COLORS } from '../../constants/config';
+import { fetchSquads, type Player, type SquadsResponse } from '../../services/api';
 import type { MatchEvent } from '../../types/prediction';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -35,13 +37,25 @@ export default function SimulationScreen() {
   }>();
   const router = useRouter();
   const { showInterstitial } = useAdMob();
-  const { savePrediction } = useUserStats();
+  const { savePrediction, addPoints } = useUserStats();
   const [predSaved, setPredSaved] = useState(false);
 
   // Red card state
   const [redCardMode, setRedCardMode] = useState(false);
   const [selectedRedCard, setSelectedRedCard] = useState<RedCardTeam>('none');
   const [appliedRedCard, setAppliedRedCard] = useState<RedCardTeam>('none');
+
+  // Key player state
+  const [squads, setSquads] = useState<SquadsResponse | null>(null);
+  const [squadLoading, setSquadLoading] = useState(false);
+  const [showSquadFor, setShowSquadFor] = useState<'home' | 'away' | null>(null);
+  const [keyPlayerPick, setKeyPlayerPick] = useState<{
+    id: number;
+    name: string;
+    team: 'home' | 'away';
+  } | null>(null);
+  const [bestPlayer, setBestPlayer] = useState<{ name: string; id: number } | null>(null);
+  const [keyPlayerResult, setKeyPlayerResult] = useState<'correct' | 'wrong' | null>(null);
 
   const { prediction, loading } = usePrediction(
     Number(params.fixtureId),
@@ -69,6 +83,51 @@ export default function SimulationScreen() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const eventIndexRef = useRef(0);
   const startTimeRef = useRef(0);
+  const finalHomeScore = useRef(0);
+  const finalAwayScore = useRef(0);
+
+  // ── Squad loading ──────────────────────────────────────────────────────────
+  async function loadSquads() {
+    if (squads || squadLoading) return;
+    setSquadLoading(true);
+    try {
+      const result = await fetchSquads(
+        Number(params.homeTeamId),
+        Number(params.awayTeamId),
+      );
+      setSquads(result);
+    } catch {
+      // fail silently – key player section becomes unavailable
+    } finally {
+      setSquadLoading(false);
+    }
+  }
+
+  // ── Determine best player after simulation finishes ───────────────────────
+  useEffect(() => {
+    if (!simFinished || !squads) return;
+
+    let pool: Player[];
+    const hScore = finalHomeScore.current;
+    const aScore = finalAwayScore.current;
+    if (hScore > aScore) pool = squads.home;
+    else if (aScore > hScore) pool = squads.away;
+    else pool = [...squads.home, ...squads.away];
+
+    if (pool.length === 0) return;
+    const best = pool[Math.floor(Math.random() * pool.length)];
+    setBestPlayer({ name: best.name, id: best.id });
+
+    if (keyPlayerPick) {
+      if (keyPlayerPick.id === best.id) {
+        setKeyPlayerResult('correct');
+        addPoints(50);
+      } else {
+        setKeyPlayerResult('wrong');
+        addPoints(-10);
+      }
+    }
+  }, [simFinished, squads]);
 
   function beginSimulation() {
     if (!prediction) return;
@@ -78,6 +137,8 @@ export default function SimulationScreen() {
     setCurrentMinute(0);
     setHomeScore(0);
     setAwayScore(0);
+    finalHomeScore.current = 0;
+    finalAwayScore.current = 0;
     setVisibleEvents([]);
     setPhase('first');
     eventIndexRef.current = 0;
@@ -135,6 +196,8 @@ export default function SimulationScreen() {
   }, [prediction, loading, appliedRedCard]);
 
   function triggerGoal(ev: MatchEvent) {
+    finalHomeScore.current = ev.home_score;
+    finalAwayScore.current = ev.away_score;
     setHomeScore(ev.home_score);
     setAwayScore(ev.away_score);
     setFlashTeam(ev.team);
@@ -175,6 +238,10 @@ export default function SimulationScreen() {
     setSelectedRedCard('none');
     setAppliedRedCard('none');
     setPredSaved(false);
+    setKeyPlayerPick(null);
+    setShowSquadFor(null);
+    setBestPlayer(null);
+    setKeyPlayerResult(null);
   }
 
   function handleSavePrediction() {
@@ -189,8 +256,29 @@ export default function SimulationScreen() {
       confidence: prediction.confidence,
       points: pts,
       timestamp: new Date().toISOString(),
+      keyPlayer: keyPlayerPick
+        ? { name: keyPlayerPick.name, team: keyPlayerPick.team }
+        : undefined,
     });
     setPredSaved(true);
+  }
+
+  function handleSquadTeamPress(team: 'home' | 'away') {
+    if (showSquadFor === team) {
+      setShowSquadFor(null);
+    } else {
+      setShowSquadFor(team);
+      loadSquads();
+    }
+  }
+
+  function handlePlayerPick(player: Player, team: 'home' | 'away') {
+    setKeyPlayerPick(
+      keyPlayerPick?.id === player.id
+        ? null
+        : { id: player.id, name: player.name, team },
+    );
+    setShowSquadFor(null);
   }
 
   if (loading) {
@@ -318,6 +406,91 @@ export default function SimulationScreen() {
               </View>
             </View>
 
+            {/* ── Key Player Pick ───────────────────────────────────────── */}
+            <View style={styles.keyPlayerSection}>
+              <Text style={styles.keyPlayerTitle}>⭐ Key Player Pick</Text>
+              <Text style={styles.keyPlayerSub}>Who will be rated highest?</Text>
+
+              <View style={styles.keyTeamRow}>
+                <TouchableOpacity
+                  style={[styles.keyTeamBtn, showSquadFor === 'home' && styles.keyTeamBtnActive]}
+                  onPress={() => handleSquadTeamPress('home')}
+                >
+                  <Text style={[styles.keyTeamBtnText, showSquadFor === 'home' && styles.keyTeamBtnTextActive]}>
+                    {params.homeName}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.keyTeamBtn, showSquadFor === 'away' && styles.keyTeamBtnActive]}
+                  onPress={() => handleSquadTeamPress('away')}
+                >
+                  <Text style={[styles.keyTeamBtnText, showSquadFor === 'away' && styles.keyTeamBtnTextActive]}>
+                    {params.awayName}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {squadLoading && (
+                <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 8 }} />
+              )}
+
+              {/* Player list */}
+              {showSquadFor && squads && (() => {
+                const squad = showSquadFor === 'home' ? squads.home : squads.away;
+                const positions = ['Defender', 'Midfielder', 'Forward'] as const;
+                return (
+                  <View style={styles.playerList}>
+                    {positions.map((pos) => {
+                      const group = squad.filter((p) => p.position === pos);
+                      if (group.length === 0) return null;
+                      return (
+                        <View key={pos}>
+                          <Text style={styles.posHeader}>{pos}s</Text>
+                          {group.map((player) => (
+                            <TouchableOpacity
+                              key={player.id}
+                              style={[
+                                styles.playerRow,
+                                keyPlayerPick?.id === player.id && styles.playerRowSelected,
+                              ]}
+                              onPress={() => handlePlayerPick(player, showSquadFor)}
+                            >
+                              <Text style={[
+                                styles.playerName,
+                                keyPlayerPick?.id === player.id && styles.playerNameSelected,
+                              ]}>
+                                {player.name}
+                              </Text>
+                              {keyPlayerPick?.id === player.id && (
+                                <Text style={styles.playerCheck}>✓</Text>
+                              )}
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      );
+                    })}
+                  </View>
+                );
+              })()}
+
+              {/* No squad data */}
+              {showSquadFor && !squads && !squadLoading && (
+                <Text style={styles.keyPlayerSub}>Could not load squad data.</Text>
+              )}
+
+              {/* Selected player chip */}
+              {keyPlayerPick && (
+                <View style={styles.keyPlayerSelected}>
+                  <Text style={styles.keyPlayerSelectedText}>
+                    ⭐ {keyPlayerPick.name} · {keyPlayerPick.team === 'home' ? params.homeName : params.awayName}
+                  </Text>
+                  <TouchableOpacity onPress={() => setKeyPlayerPick(null)}>
+                    <Text style={styles.keyPlayerClear}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
             {/* Normal and Red Card simulation buttons */}
             <View style={styles.simBtnRow}>
               <TouchableOpacity style={styles.normalSimBtn} onPress={handleStartNormal}>
@@ -384,6 +557,23 @@ export default function SimulationScreen() {
                 ? `🏆 ${params.awayName} Win`
                 : '🤝 Draw'}
             </Text>
+
+            {/* Key player result */}
+            {bestPlayer && (
+              <View style={styles.bestPlayerSection}>
+                <Text style={styles.bestPlayerTitle}>⭐ Best Player of the Match</Text>
+                <Text style={styles.bestPlayerName}>{bestPlayer.name}</Text>
+                {keyPlayerResult === 'correct' ? (
+                  <View style={[styles.keyResultBadge, styles.keyResultCorrect]}>
+                    <Text style={styles.keyResultText}>🎯 Perfect pick! +50 pts</Text>
+                  </View>
+                ) : keyPlayerResult === 'wrong' ? (
+                  <View style={[styles.keyResultBadge, styles.keyResultWrong]}>
+                    <Text style={styles.keyResultText}>❌ Wrong pick · -10 pts</Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
 
             {/* Save prediction */}
             {!predSaved ? (
@@ -518,6 +708,49 @@ const styles = StyleSheet.create({
   probVal: { fontSize: 20, fontWeight: '800' },
   probLabel: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
 
+  // Key player section
+  keyPlayerSection: {
+    width: '100%', backgroundColor: COLORS.card, borderRadius: 12,
+    padding: 14, borderWidth: 1, borderColor: COLORS.primary + '44', gap: 8,
+  },
+  keyPlayerTitle: { color: COLORS.primary, fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  keyPlayerSub: { color: COLORS.textSecondary, fontSize: 11, textAlign: 'center' },
+  keyTeamRow: { flexDirection: 'row', gap: 8 },
+  keyTeamBtn: {
+    flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center',
+    borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface,
+  },
+  keyTeamBtnActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '22' },
+  keyTeamBtnText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  keyTeamBtnTextActive: { color: COLORS.primary },
+  playerList: {
+    backgroundColor: COLORS.surface, borderRadius: 8,
+    borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden',
+  },
+  posHeader: {
+    color: COLORS.textSecondary, fontSize: 10, fontWeight: '700',
+    textTransform: 'uppercase', letterSpacing: 1,
+    paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4,
+    backgroundColor: COLORS.background,
+  },
+  playerRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 12, paddingVertical: 9,
+    borderBottomWidth: 1, borderBottomColor: COLORS.border,
+  },
+  playerRowSelected: { backgroundColor: COLORS.primary + '18' },
+  playerName: { color: COLORS.text, fontSize: 13 },
+  playerNameSelected: { color: COLORS.primary, fontWeight: '700' },
+  playerCheck: { color: COLORS.primary, fontSize: 14, fontWeight: '800' },
+  keyPlayerSelected: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: COLORS.primary + '22', borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderWidth: 1, borderColor: COLORS.primary + '66',
+  },
+  keyPlayerSelectedText: { color: COLORS.primary, fontSize: 12, fontWeight: '600', flex: 1 },
+  keyPlayerClear: { color: COLORS.textSecondary, fontSize: 16, paddingLeft: 8 },
+
   simBtnRow: { flexDirection: 'row', gap: 10, marginTop: 4, width: '100%' },
   normalSimBtn: { flex: 1, backgroundColor: COLORS.primary, paddingVertical: 13, borderRadius: 12, alignItems: 'center' },
   normalSimBtnText: { color: '#000', fontSize: 15, fontWeight: '800' },
@@ -553,11 +786,41 @@ const styles = StyleSheet.create({
   fullTimeLabel: { color: COLORS.primary, fontSize: 13, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase' },
   finalScore: { color: COLORS.text, fontSize: 52, fontWeight: '900', letterSpacing: 8 },
   finalOutcome: { color: COLORS.text, fontSize: 18, fontWeight: '700', marginTop: 4 },
+
+  // Best player / key player result
+  bestPlayerSection: {
+    width: '100%', alignItems: 'center', backgroundColor: COLORS.surface,
+    borderRadius: 10, padding: 12, borderWidth: 1, borderColor: COLORS.primary + '44', gap: 4,
+  },
+  bestPlayerTitle: { color: COLORS.textSecondary, fontSize: 11, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase' },
+  bestPlayerName: { color: COLORS.text, fontSize: 16, fontWeight: '800' },
+  keyResultBadge: {
+    paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, marginTop: 2,
+    backgroundColor: COLORS.border,
+  },
+  keyResultCorrect: { backgroundColor: COLORS.homeWin + '33' },
+  keyResultWrong: { backgroundColor: '#f85149' + '22' },
+  keyResultText: { color: COLORS.text, fontSize: 13, fontWeight: '700' },
+
   btnRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
   replayBtn: { flex: 1, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   replayBtnText: { color: COLORS.text, fontSize: 13, fontWeight: '600' },
   detailBtn: { flex: 1, backgroundColor: COLORS.primary, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   detailBtnText: { color: '#000', fontSize: 13, fontWeight: '700' },
+
+  saveBtn: {
+    backgroundColor: COLORS.primary, borderRadius: 10,
+    paddingVertical: 10, paddingHorizontal: 24,
+    alignItems: 'center', marginTop: 4, gap: 2,
+  },
+  saveBtnText: { color: '#000', fontSize: 14, fontWeight: '700' },
+  saveBtnSub: { color: '#00000088', fontSize: 11 },
+  savedBadge: {
+    backgroundColor: COLORS.surface, borderRadius: 8,
+    paddingVertical: 8, paddingHorizontal: 20,
+    borderWidth: 1, borderColor: COLORS.border, marginTop: 4,
+  },
+  savedBadgeText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600' },
 
   eventLog: { marginHorizontal: 16, marginTop: 8, gap: 6 },
   eventLogTitle: { color: COLORS.textSecondary, fontSize: 13, fontWeight: '600', marginBottom: 4 },
@@ -568,26 +831,4 @@ const styles = StyleSheet.create({
   eventIcon: { fontSize: 16 },
   eventTeam: { color: COLORS.text, fontSize: 13, fontWeight: '600', flex: 1 },
   eventScore: { color: COLORS.text, fontSize: 15, fontWeight: '800', letterSpacing: 2 },
-
-  saveBtn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    marginTop: 4,
-    gap: 2,
-  },
-  saveBtnText: { color: '#000', fontSize: 14, fontWeight: '700' },
-  saveBtnSub: { color: '#00000088', fontSize: 11 },
-  savedBadge: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginTop: 4,
-  },
-  savedBadgeText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600' },
 });

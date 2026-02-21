@@ -26,6 +26,27 @@ export async function fetchPrediction(
   return data;
 }
 
+export interface Player {
+  id: number;
+  name: string;
+  position: string;
+}
+
+export interface SquadsResponse {
+  home: Player[];
+  away: Player[];
+}
+
+export async function fetchSquads(
+  homeTeamId: number,
+  awayTeamId: number,
+): Promise<SquadsResponse> {
+  const { data } = await client.get<SquadsResponse>(
+    `/fixtures/squads?home_team_id=${homeTeamId}&away_team_id=${awayTeamId}`,
+  );
+  return data;
+}
+
 export async function checkHealth(): Promise<boolean> {
   try {
     await client.get('/health', { timeout: 5000 });

@@ -83,7 +83,7 @@ export default function HomeScreen() {
         ListHeaderComponent={
           <View>
             {/* User level badge */}
-            <View style={styles.levelCard}>
+            <TouchableOpacity style={styles.levelCard} onPress={() => router.push('/stats')}>
               <View style={styles.levelLeft}>
                 <Text style={styles.levelIcon}>{LEVEL_ICONS[level]}</Text>
                 <View>
@@ -91,10 +91,12 @@ export default function HomeScreen() {
                   <Text style={styles.levelPts}>{stats.totalPoints} pts · {stats.totalPredictions} predictions</Text>
                 </View>
               </View>
-              {next && (
+              {next ? (
                 <Text style={styles.levelNext}>{needed} pts to {next}</Text>
+              ) : (
+                <Text style={styles.levelNext}>View Stats →</Text>
               )}
-            </View>
+            </TouchableOpacity>
 
             <View style={styles.header}>
               <Text style={styles.dateLabel}>

@@ -82,6 +82,39 @@ async def get_recent_team_matches(team_id: int, limit: int = 10) -> list[dict]:
     return matches
 
 
+async def get_squad(team_id: int) -> list[dict]:
+    """Team squad for key player selection (24h cache, excludes goalkeepers)"""
+    cache_key = f"team:squad:{team_id}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        r = await client.get(
+            f"{BASE_URL}/teams/{team_id}",
+            headers=_get_headers(),
+        )
+        r.raise_for_status()
+        data = r.json()
+
+    raw_squad = data.get("squad", [])
+    position_order = {"Defender": 0, "Midfielder": 1, "Forward": 2}
+    players = sorted(
+        [
+            {
+                "id": p.get("id"),
+                "name": p.get("name", ""),
+                "position": p.get("position", ""),
+            }
+            for p in raw_squad
+            if p.get("position") != "Goalkeeper"
+        ],
+        key=lambda p: position_order.get(p["position"], 3),
+    )
+    cache.set(cache_key, players, ttl_seconds=86400)
+    return players
+
+
 async def get_standings() -> list[dict]:
     """EPL 순위표 (팀별 득실 통계 포함, 캐시 6시간)"""
     cache_key = "standings:PL"

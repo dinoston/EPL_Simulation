@@ -16,7 +16,7 @@ export default function RootLayout() {
       >
         <Stack.Screen
           name="index"
-          options={{ title: 'EPL Predictor', headerLargeTitle: true }}
+          options={{ title: 'EPL Predictor' }}
         />
         <Stack.Screen
           name="prediction/[fixtureId]"
@@ -28,6 +28,10 @@ export default function RootLayout() {
             title: 'Match Simulation',
             headerStyle: { backgroundColor: '#0d2e0a' },
           }}
+        />
+        <Stack.Screen
+          name="stats"
+          options={{ title: 'My Stats' }}
         />
       </Stack>
     </>

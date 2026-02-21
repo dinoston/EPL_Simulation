@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query
 from services import football_api
@@ -40,6 +41,22 @@ async def get_upcoming_fixtures(
         "count": len(matches),
         "fixtures": [_format_match(m) for m in matches],
     }
+
+
+@router.get("/squads")
+async def get_squads(
+    home_team_id: int = Query(...),
+    away_team_id: int = Query(...),
+):
+    """Both teams' outfield squads for key player selection."""
+    try:
+        home_squad, away_squad = await asyncio.gather(
+            football_api.get_squad(home_team_id),
+            football_api.get_squad(away_team_id),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"home": home_squad, "away": away_squad}
 
 
 def _format_match(m: dict) -> dict:
