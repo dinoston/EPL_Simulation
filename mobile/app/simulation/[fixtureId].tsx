@@ -11,6 +11,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePrediction } from '../../hooks/usePrediction';
 import { useAdMob } from '../../hooks/useAdMob';
+import { useUserStats } from '../../hooks/useUserStats';
+import { getLevel, LEVEL_ICONS } from '../../types/user';
 import { COLORS } from '../../constants/config';
 import type { MatchEvent } from '../../types/prediction';
 
@@ -33,6 +35,8 @@ export default function SimulationScreen() {
   }>();
   const router = useRouter();
   const { showInterstitial } = useAdMob();
+  const { savePrediction } = useUserStats();
+  const [predSaved, setPredSaved] = useState(false);
 
   // Red card state
   const [redCardMode, setRedCardMode] = useState(false);
@@ -170,6 +174,23 @@ export default function SimulationScreen() {
     setRedCardMode(false);
     setSelectedRedCard('none');
     setAppliedRedCard('none');
+    setPredSaved(false);
+  }
+
+  function handleSavePrediction() {
+    if (!prediction || predSaved) return;
+    const pts = Math.round(prediction.confidence * 100);
+    savePrediction({
+      fixtureId: Number(params.fixtureId),
+      homeName: params.homeName ?? 'Home',
+      awayName: params.awayName ?? 'Away',
+      predictedHome: homeScore,
+      predictedAway: awayScore,
+      confidence: prediction.confidence,
+      points: pts,
+      timestamp: new Date().toISOString(),
+    });
+    setPredSaved(true);
   }
 
   if (loading) {
@@ -363,6 +384,21 @@ export default function SimulationScreen() {
                 ? `🏆 ${params.awayName} Win`
                 : '🤝 Draw'}
             </Text>
+
+            {/* Save prediction */}
+            {!predSaved ? (
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSavePrediction}>
+                <Text style={styles.saveBtnText}>💾 Save This Prediction</Text>
+                <Text style={styles.saveBtnSub}>+{Math.round((prediction?.confidence ?? 0) * 100)} pts</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.savedBadge}>
+                <Text style={styles.savedBadgeText}>
+                  ✓ Saved · +{Math.round((prediction?.confidence ?? 0) * 100)} pts · {LEVEL_ICONS[getLevel(0)]}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.btnRow}>
               <TouchableOpacity style={styles.replayBtn} onPress={handleReplay}>
                 <Text style={styles.replayBtnText}>↻ Replay</Text>
@@ -532,4 +568,26 @@ const styles = StyleSheet.create({
   eventIcon: { fontSize: 16 },
   eventTeam: { color: COLORS.text, fontSize: 13, fontWeight: '600', flex: 1 },
   eventScore: { color: COLORS.text, fontSize: 15, fontWeight: '800', letterSpacing: 2 },
+
+  saveBtn: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 2,
+  },
+  saveBtnText: { color: '#000', fontSize: 14, fontWeight: '700' },
+  saveBtnSub: { color: '#00000088', fontSize: 11 },
+  savedBadge: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginTop: 4,
+  },
+  savedBadgeText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600' },
 });
