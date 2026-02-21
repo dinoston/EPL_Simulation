@@ -99,8 +99,13 @@ async def get_squad(team_id: int) -> list[dict]:
 
     raw_squad = data.get("squad", [])
     # football-data.org v4 returns: "Goalkeeper", "Defence", "Midfield", "Offence"
-    position_map = {"Defence": "Defender", "Midfield": "Midfielder", "Offence": "Forward"}
-    position_order = {"Defender": 0, "Midfielder": 1, "Forward": 2}
+    position_map = {
+        "Goalkeeper": "Goalkeeper",
+        "Defence": "Defender",
+        "Midfield": "Midfielder",
+        "Offence": "Forward",
+    }
+    position_order = {"Goalkeeper": 0, "Defender": 1, "Midfielder": 2, "Forward": 3}
     players = sorted(
         [
             {
@@ -109,9 +114,9 @@ async def get_squad(team_id: int) -> list[dict]:
                 "position": position_map.get(p.get("position", ""), p.get("position", "")),
             }
             for p in raw_squad
-            if p.get("position") != "Goalkeeper"
+            if p.get("name")  # include ALL players with a name (GK included)
         ],
-        key=lambda p: position_order.get(p["position"], 3),
+        key=lambda p: position_order.get(p["position"], 4),
     )
     # Clear old cache if it had wrong position names
     cache.set(cache_key, players, ttl_seconds=604800)  # 7 days

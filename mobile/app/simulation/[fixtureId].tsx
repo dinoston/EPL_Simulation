@@ -437,15 +437,16 @@ export default function SimulationScreen() {
               {/* Player list */}
               {showSquadFor && squads && (() => {
                 const squad = showSquadFor === 'home' ? squads.home : squads.away;
-                const positions = ['Defender', 'Midfielder', 'Forward'] as const;
+                const positions = ['Goalkeeper', 'Defender', 'Midfielder', 'Forward'] as const;
                 return (
                   <View style={styles.playerList}>
                     {positions.map((pos) => {
                       const group = squad.filter((p) => p.position === pos);
                       if (group.length === 0) return null;
+                      const label = pos === 'Goalkeeper' ? 'Goalkeepers' : `${pos}s`;
                       return (
                         <View key={pos}>
-                          <Text style={styles.posHeader}>{pos}s</Text>
+                          <Text style={styles.posHeader}>{label}</Text>
                           {group.map((player) => (
                             <TouchableOpacity
                               key={player.id}
