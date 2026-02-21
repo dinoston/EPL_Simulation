@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 from services import football_api
+from services.cache import cache
 
 router = APIRouter()
 
