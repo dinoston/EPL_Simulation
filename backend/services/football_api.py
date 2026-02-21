@@ -82,44 +82,103 @@ async def get_recent_team_matches(team_id: int, limit: int = 10) -> list[dict]:
     return matches
 
 
-async def get_squad(team_id: int) -> list[dict]:
-    """Team squad for key player selection (24h cache, excludes goalkeepers)"""
-    cache_key = f"team:squad:{team_id}"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
+ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1"
 
+# Hardcoded football-data.org team ID → ESPN team ID mapping for 2025-26 EPL
+_FDO_TO_ESPN: dict[int, int] = {
+    57: 359,   # Arsenal
+    58: 362,   # Aston Villa
+    1044: 349, # Bournemouth
+    402: 337,  # Brentford
+    397: 331,  # Brighton
+    61: 363,   # Chelsea
+    354: 384,  # Crystal Palace
+    62: 368,   # Everton
+    63: 370,   # Fulham
+    64: 364,   # Liverpool
+    65: 382,   # Manchester City
+    66: 360,   # Manchester United
+    67: 361,   # Newcastle United
+    351: 393,  # Nottingham Forest
+    73: 367,   # Tottenham Hotspur
+    563: 371,  # West Ham United
+    76: 380,   # Wolverhampton
+}
+
+_POSITION_ORDER = {"Goalkeeper": 0, "Defender": 1, "Midfielder": 2, "Forward": 3}
+
+
+async def _fetch_espn_squad(espn_id: int) -> list[dict]:
+    """Fetch current squad from ESPN (no auth, real-time data)."""
     async with httpx.AsyncClient(timeout=15.0) as client:
-        r = await client.get(
-            f"{BASE_URL}/teams/{team_id}",
-            headers=_get_headers(),
-        )
-        r.raise_for_status()
+        r = await client.get(f"{ESPN_URL}/teams/{espn_id}/roster")
+        if r.status_code != 200:
+            return []
         data = r.json()
 
-    raw_squad = data.get("squad", [])
-    # football-data.org v4 returns: "Goalkeeper", "Defence", "Midfield", "Offence"
-    position_map = {
-        "Goalkeeper": "Goalkeeper",
-        "Defence": "Defender",
-        "Midfield": "Midfielder",
-        "Offence": "Forward",
-    }
-    position_order = {"Goalkeeper": 0, "Defender": 1, "Midfielder": 2, "Forward": 3}
-    players = sorted(
+    pos_map = {"Goalkeeper": "Goalkeeper", "Defender": "Defender",
+               "Midfielder": "Midfielder", "Forward": "Forward", "Attacker": "Forward"}
+    players = []
+    for p in data.get("athletes", []):
+        name = p.get("displayName") or p.get("fullName", "")
+        pos = p.get("position", {}).get("name", "")
+        if name:
+            players.append({
+                "id": int(p.get("id", 0)) or None,
+                "name": name,
+                "position": pos_map.get(pos, "Midfielder"),
+            })
+    return sorted(players, key=lambda p: _POSITION_ORDER.get(p["position"], 4))
+
+
+def _parse_fdo_squad(raw_squad: list[dict]) -> list[dict]:
+    """Parse football-data.org squad array into our format."""
+    pos_map = {"Goalkeeper": "Goalkeeper", "Defence": "Defender",
+               "Midfield": "Midfielder", "Offence": "Forward"}
+    return sorted(
         [
             {
                 "id": p.get("id"),
                 "name": p.get("name", ""),
-                "position": position_map.get(p.get("position", ""), p.get("position", "")),
+                "position": pos_map.get(p.get("position", ""), p.get("position", "Midfielder")),
             }
             for p in raw_squad
-            if p.get("name")  # include ALL players with a name (GK included)
+            if p.get("name")
         ],
-        key=lambda p: position_order.get(p["position"], 4),
+        key=lambda p: _POSITION_ORDER.get(p["position"], 4),
     )
-    # Clear old cache if it had wrong position names
-    cache.set(cache_key, players, ttl_seconds=604800)  # 7 days
+
+
+async def get_squad(team_id: int) -> list[dict]:
+    """Current team squad — ESPN primary source (real-time), FDO fallback.
+    Cache: 24 hours so transfers reflect within a day."""
+    cache_key = f"team:squad:v2:{team_id}"  # v2 key to bust old 7-day cache
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    players: list[dict] = []
+
+    # 1. Try ESPN (most current data, no auth needed)
+    espn_id = _FDO_TO_ESPN.get(team_id)
+    if espn_id:
+        try:
+            players = await _fetch_espn_squad(espn_id)
+        except Exception:
+            players = []
+
+    # 2. Fall back to football-data.org if ESPN fails or team not in mapping
+    if not players:
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                r = await client.get(f"{BASE_URL}/teams/{team_id}", headers=_get_headers())
+                r.raise_for_status()
+                data = r.json()
+            players = _parse_fdo_squad(data.get("squad", []))
+        except Exception:
+            players = []
+
+    cache.set(cache_key, players, ttl_seconds=86400)  # 24 hours
     return players
 
 
