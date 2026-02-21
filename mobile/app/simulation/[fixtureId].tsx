@@ -8,6 +8,7 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePrediction } from '../../hooks/usePrediction';
@@ -56,6 +57,7 @@ export default function SimulationScreen() {
   } | null>(null);
   const [bestPlayer, setBestPlayer] = useState<{ name: string; id: number } | null>(null);
   const [keyPlayerResult, setKeyPlayerResult] = useState<'correct' | 'wrong' | null>(null);
+  const [replayCount, setReplayCount] = useState(0); // max 1 replay allowed
 
   const { prediction, loading } = usePrediction(
     Number(params.fixtureId),
@@ -242,6 +244,19 @@ export default function SimulationScreen() {
     setShowSquadFor(null);
     setBestPlayer(null);
     setKeyPlayerResult(null);
+    setReplayCount((c) => c + 1);
+  }
+
+  function handleReplayRequest() {
+    if (replayCount >= 1) return; // no more replays
+    Alert.alert(
+      '↻ Replay Simulation',
+      'You have 1 replay remaining. The current result will be cleared. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Replay', style: 'destructive', onPress: handleReplay },
+      ],
+    );
   }
 
   function handleSavePrediction() {
@@ -591,9 +606,15 @@ export default function SimulationScreen() {
             )}
 
             <View style={styles.btnRow}>
-              <TouchableOpacity style={styles.replayBtn} onPress={handleReplay}>
-                <Text style={styles.replayBtnText}>↻ Replay</Text>
-              </TouchableOpacity>
+              {replayCount < 1 ? (
+                <TouchableOpacity style={styles.replayBtn} onPress={handleReplayRequest}>
+                  <Text style={styles.replayBtnText}>↻ Replay (1 left)</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={[styles.replayBtn, { opacity: 0.35 }]}>
+                  <Text style={styles.replayBtnText}>↻ No replays left</Text>
+                </View>
+              )}
               <TouchableOpacity
                 style={styles.detailBtn}
                 onPress={() => router.push({
