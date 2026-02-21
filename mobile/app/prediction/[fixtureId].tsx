@@ -16,6 +16,8 @@ import { FatigueIndicator } from '../../components/FatigueIndicator';
 import { COLORS } from '../../constants/config';
 import type { Fixture } from '../../types/fixture';
 
+type RedCardTeam = 'none' | 'home' | 'away';
+
 export default function PredictionScreen() {
   const params = useLocalSearchParams<{
     fixtureId: string;
@@ -31,20 +33,32 @@ export default function PredictionScreen() {
   const { showInterstitial, showRewarded } = useAdMob();
   const [expertUnlocked, setExpertUnlocked] = useState(false);
 
+  // Which team user has selected for red card (not yet applied)
+  const [selectedRedCard, setSelectedRedCard] = useState<RedCardTeam>('none');
+  // Which red card is actually being simulated
+  const [appliedRedCard, setAppliedRedCard] = useState<RedCardTeam>('none');
+
   const { prediction, loading, error } = usePrediction(
     Number(params.fixtureId),
     Number(params.homeTeamId),
     Number(params.awayTeamId),
+    appliedRedCard === 'home',
+    appliedRedCard === 'away',
   );
 
-  // 예측 결과 로드 시 전면 광고 표시
+  // Show interstitial ad on initial load only
   useEffect(() => {
-    if (prediction && !loading) {
+    if (prediction && !loading && appliedRedCard === 'none') {
       showInterstitial();
     }
   }, [prediction, loading]);
 
-  // 실제 경기 데이터처럼 보이도록 더미 fixture 생성 (params에서 복원)
+  function handleRunRedCardSim() {
+    // Show ad, then apply red card and rerun simulation
+    showInterstitial();
+    setAppliedRedCard(selectedRedCard);
+  }
+
   const fixture: Fixture = {
     id: Number(params.fixtureId),
     date: params.kickoff ?? '',
@@ -52,13 +66,13 @@ export default function PredictionScreen() {
     venue: '',
     home: {
       id: Number(params.homeTeamId),
-      name: params.homeName ?? '홈팀',
+      name: params.homeName ?? 'Home',
       logo: params.homeLogo ?? '',
       winner: null,
     },
     away: {
       id: Number(params.awayTeamId),
-      name: params.awayName ?? '원정팀',
+      name: params.awayName ?? 'Away',
       logo: params.awayLogo ?? '',
       winner: null,
     },
@@ -69,8 +83,10 @@ export default function PredictionScreen() {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingTitle}>시뮬레이션 실행 중</Text>
-        <Text style={styles.loadingDesc}>10,000번 경기를 시뮬레이션하는 중입니다...</Text>
+        <Text style={styles.loadingTitle}>
+          {appliedRedCard !== 'none' ? '🟥 Red Card Simulation' : 'Running Simulation'}
+        </Text>
+        <Text style={styles.loadingDesc}>Simulating 10,000 matches...</Text>
         <Text style={styles.teams}>
           {params.homeName} vs {params.awayName}
         </Text>
@@ -82,25 +98,85 @@ export default function PredictionScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.errorIcon}>⚽</Text>
-        <Text style={styles.errorText}>{error ?? '예측을 불러오지 못했습니다.'}</Text>
+        <Text style={styles.errorText}>{error ?? 'Failed to load prediction.'}</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-    >
-      {/* 예측 결과 메인 */}
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* Active red card banner */}
+      {appliedRedCard !== 'none' && (
+        <View style={styles.redCardBanner}>
+          <Text style={styles.redCardBannerText}>
+            🟥 Red Card Applied: {appliedRedCard === 'home' ? params.homeName : params.awayName}
+          </Text>
+        </View>
+      )}
+
+      {/* Main prediction result */}
       <PredictionResult prediction={prediction} fixture={fixture} />
 
-      {/* 신뢰도 바 */}
+      {/* Red Card Scenario */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>🟥 Red Card Scenario</Text>
+        <Text style={styles.redCardHint}>Select a team, then run to see the impact</Text>
+
+        {/* Team toggle */}
+        <View style={styles.redCardRow}>
+          <TouchableOpacity
+            style={[styles.redCardBtn, selectedRedCard === 'home' && styles.redCardBtnActive]}
+            onPress={() => setSelectedRedCard(selectedRedCard === 'home' ? 'none' : 'home')}
+          >
+            <Text style={styles.redCardIcon}>🟥</Text>
+            <Text style={[styles.redCardBtnText, selectedRedCard === 'home' && styles.redCardBtnTextActive]}>
+              {params.homeName}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.redCardBtn, selectedRedCard === 'away' && styles.redCardBtnActive]}
+            onPress={() => setSelectedRedCard(selectedRedCard === 'away' ? 'none' : 'away')}
+          >
+            <Text style={styles.redCardIcon}>🟥</Text>
+            <Text style={[styles.redCardBtnText, selectedRedCard === 'away' && styles.redCardBtnTextActive]}>
+              {params.awayName}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Run button */}
+        <TouchableOpacity
+          style={[
+            styles.runRedCardBtn,
+            selectedRedCard === 'none' && styles.runRedCardBtnDisabled,
+          ]}
+          onPress={handleRunRedCardSim}
+          disabled={selectedRedCard === 'none'}
+        >
+          <Text style={styles.runRedCardBtnText}>
+            {selectedRedCard === 'none'
+              ? 'Select a team above'
+              : `▶ Run Red Card Simulation`}
+          </Text>
+        </TouchableOpacity>
+
+        {appliedRedCard !== 'none' && (
+          <TouchableOpacity
+            style={styles.resetBtn}
+            onPress={() => { setSelectedRedCard('none'); setAppliedRedCard('none'); }}
+          >
+            <Text style={styles.resetBtnText}>↩ Back to Normal</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Confidence bar */}
       <View style={styles.card}>
         <ConfidenceBar value={prediction.confidence} />
       </View>
 
-      {/* 피로도 인디케이터 */}
+      {/* Fatigue indicator */}
       <FatigueIndicator
         home={prediction.fatigue.home}
         away={prediction.fatigue.away}
@@ -108,39 +184,39 @@ export default function PredictionScreen() {
         awayName={fixture.away.name}
       />
 
-      {/* 팀 스탯 */}
+      {/* Team stats */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>팀 능력치 분석</Text>
+        <Text style={styles.cardTitle}>Team Stats</Text>
         <View style={styles.statsRow}>
-          <StatBlock label="공격력" homeVal={prediction.team_stats.home.attack} awayVal={prediction.team_stats.away.attack} />
-          <StatBlock label="수비 취약성" homeVal={prediction.team_stats.home.defense_weakness} awayVal={prediction.team_stats.away.defense_weakness} />
+          <StatBlock label="Attack" homeVal={prediction.team_stats.home.attack} awayVal={prediction.team_stats.away.attack} />
+          <StatBlock label="Def. Weakness" homeVal={prediction.team_stats.home.defense_weakness} awayVal={prediction.team_stats.away.defense_weakness} />
           <StatBlock
-            label="최근 폼"
+            label="Recent Form"
             homeVal={Math.round(prediction.team_stats.home.form * 100) / 100}
             awayVal={Math.round(prediction.team_stats.away.form * 100) / 100}
           />
         </View>
       </View>
 
-      {/* 전문가 분석 (보상형 광고 잠금 해제) */}
+      {/* Expert analysis (rewarded ad unlock) */}
       {!expertUnlocked ? (
         <TouchableOpacity
           style={styles.expertBtn}
           onPress={() => showRewarded(() => setExpertUnlocked(true))}
         >
           <Text style={styles.expertBtnIcon}>🔒</Text>
-          <Text style={styles.expertBtnText}>광고 시청 후 전문가 분석 열기</Text>
-          <Text style={styles.expertBtnSub}>부상 선수, 역대 상대전적, AI 코멘트</Text>
+          <Text style={styles.expertBtnText}>Watch Ad to Unlock Expert Analysis</Text>
+          <Text style={styles.expertBtnSub}>Injured players, H2H record, AI insights</Text>
         </TouchableOpacity>
       ) : (
         <View style={styles.expertCard}>
-          <Text style={styles.cardTitle}>전문가 분석</Text>
+          <Text style={styles.cardTitle}>Expert Analysis</Text>
           <Text style={styles.expertContent}>
-            • 홈 어드밴티지 계수: 1.15x{'\n'}
-            • 시뮬레이션 횟수: {prediction.simulations.toLocaleString()}회{'\n'}
-            • 캐시 여부: {prediction.cached ? '캐시 데이터' : '실시간 계산'}{'\n'}
-            • 홈팀 xG: {prediction.expected_goals.home}{'\n'}
-            • 원정팀 xG: {prediction.expected_goals.away}
+            • Home advantage factor: 1.15x{'\n'}
+            • Simulations: {prediction.simulations.toLocaleString()}{'\n'}
+            • Cache: {prediction.cached ? 'Cached' : 'Live'}{'\n'}
+            • Home xG: {prediction.expected_goals.home}{'\n'}
+            • Away xG: {prediction.expected_goals.away}
           </Text>
         </View>
       )}
@@ -202,6 +278,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
+  redCardBanner: {
+    backgroundColor: '#f85149' + '22',
+    borderRadius: 8,
+    padding: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f85149' + '55',
+    marginBottom: 4,
+  },
+  redCardBannerText: {
+    color: '#f85149',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   card: {
     backgroundColor: COLORS.card,
     borderRadius: 12,
@@ -214,7 +304,65 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: 13,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 8,
+  },
+  redCardHint: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    marginBottom: 10,
+  },
+  redCardRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  redCardBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    gap: 4,
+  },
+  redCardBtnActive: {
+    borderColor: '#f85149',
+    backgroundColor: '#f85149' + '22',
+  },
+  redCardIcon: {
+    fontSize: 14,
+  },
+  redCardBtnText: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  redCardBtnTextActive: {
+    color: '#f85149',
+  },
+  runRedCardBtn: {
+    backgroundColor: '#f85149',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  runRedCardBtnDisabled: {
+    backgroundColor: COLORS.border,
+  },
+  runRedCardBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  resetBtn: {
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  resetBtnText: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
   },
   statsRow: {
     flexDirection: 'row',

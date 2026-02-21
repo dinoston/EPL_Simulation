@@ -38,7 +38,7 @@ function FatigueMeter({ label, info, name }: { label: string; info: FatigueInfo;
 export function FatigueIndicator({ home, away, homeName, awayName }: Props) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>컨디션 / 피로도</Text>
+      <Text style={styles.title}>Fitness / Fatigue</Text>
       <View style={styles.row}>
         <FatigueMeter label="홈" info={home} name={homeName} />
         <View style={styles.divider} />

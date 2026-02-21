@@ -7,15 +7,15 @@ interface Props {
 }
 
 function getColor(value: number): string {
-  if (value >= 0.7) return '#38d9a9'; // 초록 (높은 신뢰도)
-  if (value >= 0.4) return '#e3b341'; // 노랑 (보통)
-  return '#f85149';                    // 빨강 (낮은 신뢰도)
+  if (value >= 0.7) return '#38d9a9';
+  if (value >= 0.4) return '#e3b341';
+  return '#f85149';
 }
 
 function getLabel(value: number): string {
-  if (value >= 0.7) return '높음';
-  if (value >= 0.4) return '보통';
-  return '낮음';
+  if (value >= 0.7) return 'High';
+  if (value >= 0.4) return 'Medium';
+  return 'Low';
 }
 
 export function ConfidenceBar({ value }: Props) {
@@ -26,13 +26,13 @@ export function ConfidenceBar({ value }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.labelRow}>
-        <Text style={styles.title}>예측 신뢰도</Text>
+        <Text style={styles.title}>Prediction Confidence</Text>
         <Text style={[styles.pct, { color }]}>{pct}% ({label})</Text>
       </View>
       <View style={styles.track}>
         <View style={[styles.fill, { width: `${pct}%`, backgroundColor: color }]} />
       </View>
-      <Text style={styles.hint}>10,000번 시뮬레이션 기반 확률</Text>
+      <Text style={styles.hint}>Based on 10,000 simulations</Text>
     </View>
   );
 }

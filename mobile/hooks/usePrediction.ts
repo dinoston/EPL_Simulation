@@ -6,6 +6,8 @@ export function usePrediction(
   fixtureId: number,
   homeTeamId: number,
   awayTeamId: number,
+  homeRedCard: boolean = false,
+  awayRedCard: boolean = false,
 ) {
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -18,16 +20,16 @@ export function usePrediction(
       setLoading(true);
       setError(null);
       try {
-        const data = await fetchPrediction(fixtureId, homeTeamId, awayTeamId);
+        const data = await fetchPrediction(fixtureId, homeTeamId, awayTeamId, homeRedCard, awayRedCard);
         if (!cancelled) {
           setPrediction(data);
         }
       } catch (e: any) {
         if (!cancelled) {
           if (e?.code === 'ECONNABORTED') {
-            setError('시뮬레이션 서버가 깨어나는 중입니다. 30초 후 다시 시도해주세요.');
+            setError('Simulation server is waking up. Please try again in 30 seconds.');
           } else {
-            setError('예측을 가져오지 못했습니다. 다시 시도해주세요.');
+            setError('Failed to load prediction. Please try again.');
           }
         }
       } finally {
@@ -37,7 +39,7 @@ export function usePrediction(
 
     run();
     return () => { cancelled = true; };
-  }, [fixtureId, homeTeamId, awayTeamId]);
+  }, [fixtureId, homeTeamId, awayTeamId, homeRedCard, awayRedCard]);
 
   return { prediction, loading, error };
 }

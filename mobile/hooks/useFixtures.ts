@@ -17,11 +17,11 @@ export function useFixtures() {
       setDate(data.date);
     } catch (e: any) {
       if (e?.code === 'ECONNABORTED') {
-        setError('서버 연결 중입니다. 잠시 후 다시 시도해주세요.');
+        setError('Server is warming up. Please try again in a moment.');
       } else if (e?.response?.status === 502) {
-        setError('경기 데이터를 가져오지 못했습니다. API 키를 확인해주세요.');
+        setError('Failed to load fixtures. Please check the API key.');
       } else {
-        setError('네트워크 오류가 발생했습니다.');
+        setError('A network error occurred.');
       }
     } finally {
       setLoading(false);

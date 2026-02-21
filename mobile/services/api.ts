@@ -5,7 +5,7 @@ import type { PredictionResponse } from '../types/prediction';
 
 const client = axios.create({
   baseURL: API_URL,
-  timeout: 30000, // 30초 (서버 콜드 스타트 고려)
+  timeout: 30000, // 30s (accounts for server cold start)
 });
 
 export async function fetchTodayFixtures(): Promise<FixturesResponse> {
@@ -17,9 +17,11 @@ export async function fetchPrediction(
   fixtureId: number,
   homeTeamId: number,
   awayTeamId: number,
+  homeRedCard: boolean = false,
+  awayRedCard: boolean = false,
 ): Promise<PredictionResponse> {
   const { data } = await client.post<PredictionResponse>(
-    `/predict/?fixture_id=${fixtureId}&home_team_id=${homeTeamId}&away_team_id=${awayTeamId}`,
+    `/predict/?fixture_id=${fixtureId}&home_team_id=${homeTeamId}&away_team_id=${awayTeamId}&home_red_card=${homeRedCard}&away_red_card=${awayRedCard}`,
   );
   return data;
 }

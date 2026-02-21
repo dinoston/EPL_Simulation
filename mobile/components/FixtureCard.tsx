@@ -11,32 +11,30 @@ interface Props {
 
 function formatKickoffTime(dateStr: string): string {
   const d = new Date(dateStr);
-  return d.toLocaleTimeString('ko-KR', {
+  return d.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-    timeZone: 'Asia/Seoul',
   });
 }
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
-  return d.toLocaleDateString('ko-KR', {
+  return d.toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
     weekday: 'short',
-    timeZone: 'Asia/Seoul',
   });
 }
 
 function getStatusBadge(status: string): { label: string; color: string } {
   switch (status) {
-    case 'NS': return { label: '예정', color: COLORS.accent };
+    case 'NS': return { label: 'Upcoming', color: COLORS.accent };
     case 'LIVE':
     case '1H':
     case '2H':
-    case 'HT': return { label: '진행 중', color: COLORS.danger };
-    case 'FT': return { label: '종료', color: COLORS.textSecondary };
+    case 'HT': return { label: 'Live', color: COLORS.danger };
+    case 'FT': return { label: 'Full Time', color: COLORS.textSecondary };
     default: return { label: status, color: COLORS.textSecondary };
   }
 }
@@ -57,13 +55,13 @@ export function FixtureCard({ fixture, onPress, onSimulationPress }: Props) {
       </View>
 
       <View style={styles.matchRow}>
-        {/* 홈팀 */}
+        {/* Home team */}
         <View style={styles.team}>
           <Image source={{ uri: fixture.home.logo }} style={styles.logo} />
           <Text style={styles.teamName} numberOfLines={2}>{fixture.home.name}</Text>
         </View>
 
-        {/* 스코어 / 킥오프 시간 */}
+        {/* Score / kickoff time */}
         <View style={styles.centerBlock}>
           {!isScheduled && fixture.score.home !== null ? (
             <>
@@ -73,12 +71,12 @@ export function FixtureCard({ fixture, onPress, onSimulationPress }: Props) {
           ) : (
             <>
               <Text style={styles.versus}>VS</Text>
-              <Text style={styles.kickoff}>{kickoff} KST</Text>
+              <Text style={styles.kickoff}>{kickoff}</Text>
             </>
           )}
         </View>
 
-        {/* 원정팀 */}
+        {/* Away team */}
         <View style={[styles.team, styles.awayTeam]}>
           <Image source={{ uri: fixture.away.logo }} style={styles.logo} />
           <Text style={styles.teamName} numberOfLines={2}>{fixture.away.name}</Text>
@@ -88,10 +86,10 @@ export function FixtureCard({ fixture, onPress, onSimulationPress }: Props) {
       {isScheduled && (
         <View style={styles.btnRow}>
           <TouchableOpacity style={styles.simBtn} onPress={onSimulationPress}>
-            <Text style={styles.simBtnText}>▶ 시뮬레이션</Text>
+            <Text style={styles.simBtnText}>▶ Simulate</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.predictBtn} onPress={onPress}>
-            <Text style={styles.predictBtnText}>AI 예측 분석</Text>
+            <Text style={styles.predictBtnText}>AI Prediction</Text>
           </TouchableOpacity>
         </View>
       )}

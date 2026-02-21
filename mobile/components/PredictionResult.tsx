@@ -41,16 +41,16 @@ export function PredictionResult({ prediction, fixture }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* 팀 헤더 */}
+      {/* Team header */}
       <View style={styles.teamsRow}>
         <View style={styles.teamBlock}>
           <Image source={{ uri: fixture.home.logo }} style={styles.logo} />
           <Text style={styles.teamName} numberOfLines={2}>{fixture.home.name}</Text>
-          <Text style={styles.teamLabel}>홈</Text>
+          <Text style={styles.teamLabel}>Home</Text>
         </View>
 
         <View style={styles.scoreBlock}>
-          <Text style={styles.scoreLabel}>예측 점수</Text>
+          <Text style={styles.scoreLabel}>Predicted Score</Text>
           <Text style={styles.score}>{predicted_score.home} - {predicted_score.away}</Text>
           <Text style={styles.xgText}>
             xG: {expected_goals.home} - {expected_goals.away}
@@ -60,35 +60,35 @@ export function PredictionResult({ prediction, fixture }: Props) {
         <View style={styles.teamBlock}>
           <Image source={{ uri: fixture.away.logo }} style={styles.logo} />
           <Text style={styles.teamName} numberOfLines={2}>{fixture.away.name}</Text>
-          <Text style={styles.teamLabel}>원정</Text>
+          <Text style={styles.teamLabel}>Away</Text>
         </View>
       </View>
 
-      {/* 승/무/패 확률 막대 */}
+      {/* Win/Draw/Loss probability bars */}
       <View style={styles.probSection}>
-        <Text style={styles.sectionTitle}>승률 예측</Text>
+        <Text style={styles.sectionTitle}>Win Probability</Text>
         <View style={styles.probRow}>
           <ProbBar
-            label={`${fixture.home.name}\n홈승`}
+            label={`${fixture.home.name}\nHome Win`}
             value={probabilities.home_win}
             color={COLORS.homeWin}
           />
           <ProbBar
-            label="무승부"
+            label="Draw"
             value={probabilities.draw}
             color={COLORS.draw}
           />
           <ProbBar
-            label={`${fixture.away.name}\n원정승`}
+            label={`${fixture.away.name}\nAway Win`}
             value={probabilities.away_win}
             color={COLORS.awayWin}
           />
         </View>
       </View>
 
-      {/* 주요 스코어라인 */}
+      {/* Top scorelines */}
       <View style={styles.scorelineSection}>
-        <Text style={styles.sectionTitle}>주요 예상 스코어</Text>
+        <Text style={styles.sectionTitle}>Top Scorelines</Text>
         <View style={styles.scorelines}>
           {top_scorelines.map((item, i) => (
             <View key={i} style={[styles.scorelineItem, i === 0 && styles.scorelineTop]}>

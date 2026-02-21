@@ -20,12 +20,12 @@ export default function RootLayout() {
         />
         <Stack.Screen
           name="prediction/[fixtureId]"
-          options={{ title: '경기 예측' }}
+          options={{ title: 'Match Prediction' }}
         />
         <Stack.Screen
           name="simulation/[fixtureId]"
           options={{
-            title: '경기 시뮬레이션',
+            title: 'Match Simulation',
             headerStyle: { backgroundColor: '#0d2e0a' },
           }}
         />

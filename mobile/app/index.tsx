@@ -42,7 +42,7 @@ export default function HomeScreen() {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>경기 일정 불러오는 중...</Text>
+        <Text style={styles.loadingText}>Loading fixtures...</Text>
       </View>
     );
   }
@@ -53,7 +53,7 @@ export default function HomeScreen() {
         <Text style={styles.errorIcon}>⚠️</Text>
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={refetch}>
-          <Text style={styles.retryText}>다시 시도</Text>
+          <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
       </View>
     );
@@ -81,10 +81,10 @@ export default function HomeScreen() {
         ListHeaderComponent={
           <View style={styles.header}>
             <Text style={styles.dateLabel}>
-              {date ? `${date} EPL 경기` : 'EPL 경기 일정'}
+              {date ? `${date} EPL Matches` : 'EPL Schedule'}
             </Text>
             {fixtures.length === 0 && !loading && (
-              <Text style={styles.noMatch}>오늘 예정된 경기가 없습니다</Text>
+              <Text style={styles.noMatch}>No matches scheduled today</Text>
             )}
           </View>
         }

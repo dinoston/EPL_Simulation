@@ -1,3 +1,4 @@
+
 from datetime import datetime, timezone
 from typing import Any
 
@@ -52,12 +53,12 @@ def calculate_fatigue_modifier(matches: list[dict[str, Any]], team_id: int) -> f
 
 def get_fatigue_label(modifier: float) -> str:
     if modifier >= 0.95:
-        return "최상"
+        return "Excellent"
     elif modifier >= 0.85:
-        return "양호"
+        return "Good"
     elif modifier >= 0.75:
-        return "보통"
+        return "Fair"
     elif modifier >= 0.65:
-        return "피로"
+        return "Fatigued"
     else:
-        return "극심한 피로"
+        return "Exhausted"

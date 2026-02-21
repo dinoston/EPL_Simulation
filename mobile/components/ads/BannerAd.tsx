@@ -29,7 +29,7 @@ export function BannerAd() {
   if (!__DEV__) return null;
   return (
     <View style={styles.placeholder}>
-      <Text style={styles.text}>📢 광고 영역 (AdMob 연동 후 활성화)</Text>
+      <Text style={styles.text}>📢 Ad Space (Activates after AdMob setup)</Text>
     </View>
   );
 }
