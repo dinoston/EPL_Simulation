@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useFixtures } from '../hooks/useFixtures';
 import { useUserStats } from '../hooks/useUserStats';
+import { usePendingResults } from '../hooks/usePendingResults';
 import { FixtureCard } from '../components/FixtureCard';
 import { BannerAd } from '../components/ads/BannerAd';
 import { COLORS } from '../constants/config';
@@ -21,6 +22,9 @@ export default function HomeScreen() {
   const { fixtures, loading, error, date, refetch } = useFixtures();
   const { stats } = useUserStats();
   const router = useRouter();
+
+  // Check real match results for unresolved predictions
+  usePendingResults();
 
   const level = getLevel(stats.totalPoints);
   const { next, needed } = getNextLevelPoints(stats.totalPoints);

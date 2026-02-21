@@ -47,6 +47,16 @@ export async function fetchSquads(
   return data;
 }
 
+export interface MatchResult {
+  status: string;
+  score: { home: number; away: number } | null;
+}
+
+export async function fetchMatchResult(fixtureId: number): Promise<MatchResult> {
+  const { data } = await client.get<MatchResult>(`/fixtures/result/${fixtureId}`);
+  return data;
+}
+
 export async function checkHealth(): Promise<boolean> {
   try {
     await client.get('/health', { timeout: 5000 });

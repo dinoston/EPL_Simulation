@@ -63,6 +63,7 @@ async def predict_match(
         away_fatigue=away_fatigue_mod,
         home_form=home_form,
         away_form=away_form,
+        fixture_id=fixture_id,
     )
 
     result = {

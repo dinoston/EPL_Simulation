@@ -98,20 +98,23 @@ async def get_squad(team_id: int) -> list[dict]:
         data = r.json()
 
     raw_squad = data.get("squad", [])
+    # football-data.org v4 returns: "Goalkeeper", "Defence", "Midfield", "Offence"
+    position_map = {"Defence": "Defender", "Midfield": "Midfielder", "Offence": "Forward"}
     position_order = {"Defender": 0, "Midfielder": 1, "Forward": 2}
     players = sorted(
         [
             {
                 "id": p.get("id"),
                 "name": p.get("name", ""),
-                "position": p.get("position", ""),
+                "position": position_map.get(p.get("position", ""), p.get("position", "")),
             }
             for p in raw_squad
             if p.get("position") != "Goalkeeper"
         ],
         key=lambda p: position_order.get(p["position"], 3),
     )
-    cache.set(cache_key, players, ttl_seconds=86400)
+    # Clear old cache if it had wrong position names
+    cache.set(cache_key, players, ttl_seconds=604800)  # 7 days
     return players
 
 

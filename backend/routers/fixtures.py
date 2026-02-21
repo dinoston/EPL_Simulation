@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
+import httpx
 from fastapi import APIRouter, HTTPException, Query
 from services import football_api
 
@@ -41,6 +42,35 @@ async def get_upcoming_fixtures(
         "count": len(matches),
         "fixtures": [_format_match(m) for m in matches],
     }
+
+
+@router.get("/result/{fixture_id}")
+async def get_match_result(fixture_id: int):
+    """Fetch real match result — used next day to resolve predictions."""
+    cache_key = f"match:result:{fixture_id}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    async with httpx.AsyncClient(timeout=15.0) as http:
+        r = await http.get(
+            f"{football_api.BASE_URL}/matches/{fixture_id}",
+            headers=football_api._get_headers(),
+        )
+        r.raise_for_status()
+        data = r.json()
+
+    status = data.get("status", "SCHEDULED")
+    score = data.get("score", {}).get("fullTime", {})
+    result = {
+        "status": status,
+        "score": {"home": score.get("home"), "away": score.get("away")}
+        if status == "FINISHED"
+        else None,
+    }
+    ttl = 86400 if status == "FINISHED" else 300
+    cache.set(cache_key, result, ttl_seconds=ttl)
+    return result
 
 
 @router.get("/squads")

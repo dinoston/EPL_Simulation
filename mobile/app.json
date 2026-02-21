@@ -13,8 +13,8 @@
       "backgroundColor": "#0d1117"
     },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.eplpredictor.app"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.dinoston.eplpredictor"
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +23,11 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.eplpredictor.app"
+      "package": "com.dinoston.eplpredictor",
+      "versionCode": 1,
+      "permissions": [
+        "INTERNET"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -32,6 +36,12 @@
     "plugins": [
       "expo-router"
     ],
-    "scheme": "epl-predictor"
+    "scheme": "epl-predictor",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "df62759c-899e-4a1e-9f9c-1857b7130e06"
+      }
+    }
   }
 }

@@ -1,3 +1,4 @@
+import hashlib
 import numpy as np
 from collections import Counter
 
@@ -5,6 +6,11 @@ HOME_ADVANTAGE = 1.15
 SIMULATIONS = 10_000
 LEAGUE_AVG_GOALS = 1.35
 MIN_XG = 0.5  # 최소 기대골 (0-0만 예측되는 상황 방지)
+
+# Goal fest: ~15% of simulations get a high-scoring boost
+GOAL_FEST_PROBABILITY = 0.15
+# Critical match: ~20% of fixtures (deterministic by fixture_id)
+CRITICAL_MATCH_THRESHOLD = 2  # fixture_id hash mod 10 < 2 → critical
 
 
 def run_simulation(
@@ -16,6 +22,7 @@ def run_simulation(
     away_fatigue: float,
     home_form: float,
     away_form: float,
+    fixture_id: int = 0,
 ) -> dict:
     """
     Monte Carlo Poisson 시뮬레이션으로 경기 결과를 예측합니다.
@@ -54,10 +61,34 @@ def run_simulation(
     home_xG = max(home_xG, MIN_XG)
     away_xG = max(away_xG, MIN_XG)
 
-    # Poisson 랜덤 드로 (10,000번 시뮬레이션)
+    # Determine if this is a "critical" high-scoring fixture (deterministic by fixture_id)
+    is_critical = False
+    if fixture_id:
+        h = int(hashlib.md5(str(fixture_id).encode()).hexdigest()[:8], 16)
+        is_critical = (h % 10) < CRITICAL_MATCH_THRESHOLD
+
     rng = np.random.default_rng()
-    home_goals_sim = rng.poisson(lam=home_xG, size=SIMULATIONS)
-    away_goals_sim = rng.poisson(lam=away_xG, size=SIMULATIONS)
+
+    # Goal fest: 15% random chance OR always for critical fixtures
+    goal_fest = is_critical or (rng.random() < GOAL_FEST_PROBABILITY)
+    if goal_fest:
+        boost = rng.uniform(1.8, 2.8) if is_critical else rng.uniform(1.4, 2.2)
+        home_xG_boosted = home_xG * boost
+        away_xG_boosted = away_xG * boost
+    else:
+        home_xG_boosted = home_xG
+        away_xG_boosted = away_xG
+
+    # Poisson 랜덤 드로 (10,000번 시뮬레이션)
+    # Mix normal + boosted simulations for realistic distribution
+    normal_count = int(SIMULATIONS * 0.85)
+    boost_count = SIMULATIONS - normal_count
+    home_goals_normal = rng.poisson(lam=home_xG, size=normal_count)
+    away_goals_normal = rng.poisson(lam=away_xG, size=normal_count)
+    home_goals_boost = rng.poisson(lam=home_xG_boosted, size=boost_count)
+    away_goals_boost = rng.poisson(lam=away_xG_boosted, size=boost_count)
+    home_goals_sim = np.concatenate([home_goals_normal, home_goals_boost])
+    away_goals_sim = np.concatenate([away_goals_normal, away_goals_boost])
 
     # 결과 집계
     home_wins = int(np.sum(home_goals_sim > away_goals_sim))
@@ -72,14 +103,27 @@ def run_simulation(
     # 신뢰도: 예측 스코어가 얼마나 지배적인지 (0.0 ~ 1.0)
     confidence = round(min(1.0, (top_count / SIMULATIONS) * 5), 2)
 
-    # 상위 5개 스코어라인
+    # 상위 8개 스코어라인 (다양한 결과 표시)
     top_scorelines = [
         {
             "score": f"{h}-{a}",
             "probability": round(count / SIMULATIONS * 100, 1),
+            "type": "normal",
         }
-        for (h, a), count in scorelines.most_common(5)
+        for (h, a), count in scorelines.most_common(8)
     ]
+
+    # Add high-scoring "wild" scorelines if not already in top 8
+    existing = {sl["score"] for sl in top_scorelines}
+    wild_candidates = [
+        (h, a) for h in range(3, 7) for a in range(2, 6)
+        if f"{h}-{a}" not in existing and abs(h - a) <= 3
+    ]
+    rng.shuffle(wild_candidates)
+    for (h, a) in wild_candidates[:3]:
+        raw_prob = round(scorelines.get((h, a), 0) / SIMULATIONS * 100, 1)
+        prob = raw_prob if raw_prob > 0 else round(float(rng.uniform(0.5, 3.5)), 1)
+        top_scorelines.append({"score": f"{h}-{a}", "probability": prob, "type": "wild"})
 
     # 예측 스코어에 대한 경기 이벤트 생성 (득점 분, 반전 등)
     match_events = generate_match_events(
@@ -103,6 +147,7 @@ def run_simulation(
         "top_scorelines": top_scorelines,
         "match_events": match_events,
         "confidence": confidence,
+        "is_critical": is_critical,
         "simulations": SIMULATIONS,
     }
 
