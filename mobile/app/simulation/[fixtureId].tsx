@@ -271,6 +271,7 @@ export default function SimulationScreen() {
       confidence: prediction.confidence,
       points: pts,
       timestamp: new Date().toISOString(),
+      isCritical: prediction.is_critical ?? false,
       keyPlayer: keyPlayerPick
         ? { name: keyPlayerPick.name, team: keyPlayerPick.team }
         : undefined,

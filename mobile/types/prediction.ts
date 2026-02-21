@@ -55,4 +55,5 @@ export interface PredictionResponse {
   confidence: number;
   simulations: number;
   cached: boolean;
+  is_critical?: boolean;
 }

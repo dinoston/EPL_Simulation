@@ -177,8 +177,13 @@ function PredictionCard({ p }: { p: SavedPrediction }) {
           isExact ? pcStyles.ptsExact : isCorrect ? pcStyles.ptsCorrect : p.resolved ? pcStyles.ptsWrong : {},
         ]}>
           <Text style={pcStyles.ptsVal}>{totalPts} pts</Text>
-          {(p.bonusPoints ?? 0) > 0 && (
-            <Text style={pcStyles.ptsBonus}>+{p.bonusPoints} bonus</Text>
+          {p.resolved && p.bonusPoints != null && (
+            <Text style={[
+              pcStyles.ptsBonus,
+              p.bonusPoints < 0 ? pcStyles.bonusNeg : {},
+            ]}>
+              {p.bonusPoints >= 0 ? `▲+${p.bonusPoints}` : `▼${p.bonusPoints}`}
+            </Text>
           )}
         </View>
       </View>
@@ -263,6 +268,7 @@ const pcStyles = StyleSheet.create({
   ptsWrong: { backgroundColor: '#f8514911', borderColor: '#f8514933' },
   ptsVal: { color: COLORS.text, fontSize: 13, fontWeight: '800' },
   ptsBonus: { color: COLORS.primary, fontSize: 9, fontWeight: '600' },
+  bonusNeg: { color: COLORS.danger },
 
   scoresRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
   scoreBlock: {

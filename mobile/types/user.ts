@@ -65,7 +65,16 @@ export function getNextLevelPoints(totalPoints: number): { next: UserLevel | nul
   return { next: 'Semi-Pro', needed: 20 - totalPoints };
 }
 
-/** Calculate accuracy bonus (0–4) compared to real result. */
+/**
+ * Calculate accuracy bonus/penalty compared to real result.
+ * Correct = positive, Wrong = negative.
+ * Base +1 pt is always awarded at save time for participation.
+ *
+ * Exact score:      +4 pts (net +5 with base)
+ * Correct winner:   +2 pts (net +3 with base)
+ * Wrong prediction: -2 pts (net -1 with base — points decrease)
+ * Critical match:   bonus × 1.5 (both positive and negative)
+ */
 export function calcAccuracyBonus(
   predictedHome: number,
   predictedAway: number,
@@ -77,17 +86,24 @@ export function calcAccuracyBonus(
     predictedHome > predictedAway ? 'home' : predictedAway > predictedHome ? 'away' : 'draw';
   const realWinner = realHome > realAway ? 'home' : realAway > realHome ? 'away' : 'draw';
 
-  let bonus = 0;
-  if (predWinner === realWinner) bonus += 2; // correct result
-  if (predictedHome === realHome && predictedAway === realAway) {
-    bonus += 2; // exact score
-  } else if (
-    Math.abs(predictedHome - realHome) <= 1 &&
-    Math.abs(predictedAway - realAway) <= 1
-  ) {
-    bonus += 1; // close score
+  const exactScore = predictedHome === realHome && predictedAway === realAway;
+  const correctWinner = predWinner === realWinner;
+
+  let bonus: number;
+  if (exactScore) {
+    bonus = 4; // perfect: +4
+  } else if (correctWinner) {
+    bonus = 2; // right winner: +2
+  } else {
+    bonus = -2; // wrong: -2 penalty
   }
 
-  if (isCritical) bonus = Math.min(5, Math.ceil(bonus * 1.5)); // critical ×1.5, capped at 5
+  if (isCritical) {
+    // Critical match: ×1.5 (rounded), cap positive at +6, cap negative at -3
+    bonus = bonus > 0
+      ? Math.min(6, Math.ceil(bonus * 1.5))
+      : Math.max(-3, Math.floor(bonus * 1.5));
+  }
+
   return bonus;
 }
