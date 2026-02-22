@@ -18,7 +18,9 @@ export function usePendingResults() {
 
     // Check each unresolved prediction with a small delay between calls
     // to avoid hammering the backend (free tier: 10 req/min)
+    const timeoutIds: ReturnType<typeof setTimeout>[] = [];
     let delay = 0;
+
     for (const pred of unresolved) {
       const timeoutId = setTimeout(async () => {
         try {
@@ -43,8 +45,12 @@ export function usePendingResults() {
           // ignore — will retry next session
         }
       }, delay);
+
+      timeoutIds.push(timeoutId);
       delay += 6000; // 6s between calls → well within 10 req/min
-      return () => clearTimeout(timeoutId);
     }
+
+    // Clean up ALL timeouts on unmount (not just the first one)
+    return () => timeoutIds.forEach((id) => clearTimeout(id));
   }, [stats.predictions.length]);
 }

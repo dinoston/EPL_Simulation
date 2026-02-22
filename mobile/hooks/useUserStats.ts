@@ -20,8 +20,29 @@ export function useUserStats() {
       if (raw) {
         try {
           const parsed = JSON.parse(raw);
-          // Migrate old data that lacks pendingNotifications
-          setStats({ pendingNotifications: [], ...parsed });
+
+          // Migration: fix predictions that were resolved with invalid (null) scores
+          // due to the old bug where score={home:null,away:null} passed the check.
+          // Mark them unresolved so usePendingResults re-fetches the correct result.
+          let pointsCorrection = 0;
+          const fixedPredictions = (parsed.predictions ?? []).map((p: SavedPrediction) => {
+            const hasInvalidScore =
+              p.resolved &&
+              p.realScore != null &&
+              (typeof p.realScore.home !== 'number' || typeof p.realScore.away !== 'number');
+            if (hasInvalidScore) {
+              pointsCorrection -= p.bonusPoints ?? 0; // reverse the wrong bonus
+              return { ...p, resolved: false, realScore: undefined, bonusPoints: undefined };
+            }
+            return p;
+          });
+
+          setStats({
+            pendingNotifications: [],
+            ...parsed,
+            predictions: fixedPredictions,
+            totalPoints: Math.max(0, (parsed.totalPoints ?? 0) + pointsCorrection),
+          });
         } catch {
           // ignore parse errors
         }
