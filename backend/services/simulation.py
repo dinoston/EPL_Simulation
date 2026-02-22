@@ -5,7 +5,7 @@ from collections import Counter
 HOME_ADVANTAGE = 1.15
 SIMULATIONS = 10_000
 LEAGUE_AVG_GOALS = 1.55   # EPL 2024-25 실제 평균 (~1.5 per team per game)
-MIN_XG = 0.85             # 최소 기대골 상향 (1-0 편중 방지)
+MIN_XG = 1.0              # 최소 기대골 — 평균 공식 사용으로 극단값 방지됨
 
 # Goal fest: ~15% of simulations get a high-scoring boost
 GOAL_FEST_PROBABILITY = 0.15
@@ -39,19 +39,21 @@ def run_simulation(
     home_form_factor = 0.85 + 0.30 * home_form
     away_form_factor = 0.85 + 0.30 * away_form
 
-    # 기대골 (xG) 계산 - Dixon-Coles 간소화 모델
-    # home_xG = home_attack(득점력) × away_defense(상대 수비 취약성) × 리그평균 × 홈이점 × 피로 × 폼
+    # 기대골 (xG) 계산 - 평균 기반 모델
+    # 곱셈 방식은 두 팀 모두 평균 이하일 때 xG가 제곱으로 낮아지는 문제 발생.
+    # 대신 팀 공격력과 상대 수비 취약도의 평균을 사용: (attack + def_weakness) / 2
+    # → 평균팀 vs 평균팀: xG = 1.0 * LEAGUE_AVG * HOME_ADVANTAGE (이전과 동일)
+    # → 약팀 vs 강팀:    xG = 0.65 * LEAGUE_AVG (적절한 낮은 값)
+    # → 약팀 vs 약팀:    xG = 0.85 * LEAGUE_AVG (곱셈보다 훨씬 현실적)
     home_xG = (
-        home_attack
-        * away_defense
+        (home_attack + away_defense) / 2
         * LEAGUE_AVG_GOALS
         * HOME_ADVANTAGE
         * home_fatigue
         * home_form_factor
     )
     away_xG = (
-        away_attack
-        * home_defense
+        (away_attack + home_defense) / 2
         * LEAGUE_AVG_GOALS
         * away_fatigue
         * away_form_factor
