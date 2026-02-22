@@ -76,10 +76,11 @@ def run_simulation(
     home_xG = home_xG * rng.uniform(1.0, 1.3)
     away_xG = away_xG * rng.uniform(1.0, 1.3)
 
-    # Goal fest: 15% random chance OR always for critical fixtures
+    # Goal fest: 30% random chance OR always for critical fixtures
+    # 부스트 범위를 올려서 5-0, 5-2, 6-1 같은 대량 득점 경기도 등장
     goal_fest = is_critical or (rng.random() < GOAL_FEST_PROBABILITY)
     if goal_fest:
-        boost = rng.uniform(1.8, 2.8) if is_critical else rng.uniform(1.4, 2.2)
+        boost = rng.uniform(2.5, 4.0) if is_critical else rng.uniform(2.0, 3.5)
         home_xG_boosted = home_xG * boost
         away_xG_boosted = away_xG * boost
     else:
@@ -87,8 +88,8 @@ def run_simulation(
         away_xG_boosted = away_xG
 
     # Poisson 랜덤 드로 (10,000번 시뮬레이션)
-    # Mix normal + boosted simulations for realistic distribution
-    normal_count = int(SIMULATIONS * 0.85)
+    # Mix normal(70%) + boosted(30%) simulations
+    normal_count = int(SIMULATIONS * 0.70)
     boost_count = SIMULATIONS - normal_count
     home_goals_normal = rng.poisson(lam=home_xG, size=normal_count)
     away_goals_normal = rng.poisson(lam=away_xG, size=normal_count)
