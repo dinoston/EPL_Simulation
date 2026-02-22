@@ -4,11 +4,11 @@ from collections import Counter
 
 HOME_ADVANTAGE = 1.15
 SIMULATIONS = 10_000
-LEAGUE_AVG_GOALS = 1.55   # EPL 2024-25 실제 평균 (~1.5 per team per game)
-MIN_XG = 1.0              # 최소 기대골 — 평균 공식 사용으로 극단값 방지됨
+LEAGUE_AVG_GOALS = 2.5    # 득점 다양성 확보 (3-0, 4-2, 5-1 등이 자연스럽게 등장)
+MIN_XG = 1.5              # 최소 xG — 약팀 매치업도 최소 득점 보장
 
-# Goal fest: ~15% of simulations get a high-scoring boost
-GOAL_FEST_PROBABILITY = 0.15
+# Goal fest: ~30% of games are high-scoring
+GOAL_FEST_PROBABILITY = 0.30
 # Critical match: ~20% of fixtures (deterministic by fixture_id)
 CRITICAL_MATCH_THRESHOLD = 2  # fixture_id hash mod 10 < 2 → critical
 
@@ -71,10 +71,10 @@ def run_simulation(
 
     rng = np.random.default_rng()
 
-    # 경기별 xG 노이즈: ±15% 랜덤 변동 (현실적 득점 분포를 위해)
-    # 실제 경기에서 xG가 그대로 득점으로 이어지지 않음
-    home_xG = home_xG * rng.uniform(0.85, 1.15)
-    away_xG = away_xG * rng.uniform(0.85, 1.15)
+    # 경기별 득점 변동성: 경기마다 예상보다 많이/적게 득점하는 경향 반영
+    # 0~+30% 상향 부스트 (xG를 낮추지 않음 → 저득점 편중 방지)
+    home_xG = home_xG * rng.uniform(1.0, 1.3)
+    away_xG = away_xG * rng.uniform(1.0, 1.3)
 
     # Goal fest: 15% random chance OR always for critical fixtures
     goal_fest = is_critical or (rng.random() < GOAL_FEST_PROBABILITY)
