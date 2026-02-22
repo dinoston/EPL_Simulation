@@ -1,7 +1,7 @@
 from typing import Any
 
-# EPL 2024/25 시즌 기준 평균 골 (팀당 경기당)
-LEAGUE_AVG_GOALS = 1.35
+# EPL 2024/25 시즌 기준 평균 골 (팀당 경기당) — simulation.py와 동일하게 유지
+LEAGUE_AVG_GOALS = 1.55
 
 
 def extract_stats(

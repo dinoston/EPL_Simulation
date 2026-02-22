@@ -4,8 +4,8 @@ from collections import Counter
 
 HOME_ADVANTAGE = 1.15
 SIMULATIONS = 10_000
-LEAGUE_AVG_GOALS = 1.35
-MIN_XG = 0.5  # 최소 기대골 (0-0만 예측되는 상황 방지)
+LEAGUE_AVG_GOALS = 1.55   # EPL 2024-25 실제 평균 (~1.5 per team per game)
+MIN_XG = 0.85             # 최소 기대골 상향 (1-0 편중 방지)
 
 # Goal fest: ~15% of simulations get a high-scoring boost
 GOAL_FEST_PROBABILITY = 0.15
@@ -69,6 +69,11 @@ def run_simulation(
 
     rng = np.random.default_rng()
 
+    # 경기별 xG 노이즈: ±15% 랜덤 변동 (현실적 득점 분포를 위해)
+    # 실제 경기에서 xG가 그대로 득점으로 이어지지 않음
+    home_xG = home_xG * rng.uniform(0.85, 1.15)
+    away_xG = away_xG * rng.uniform(0.85, 1.15)
+
     # Goal fest: 15% random chance OR always for critical fixtures
     goal_fest = is_critical or (rng.random() < GOAL_FEST_PROBABILITY)
     if goal_fest:
@@ -95,10 +100,18 @@ def run_simulation(
     draws = int(np.sum(home_goals_sim == away_goals_sim))
     away_wins = int(np.sum(away_goals_sim > home_goals_sim))
 
-    # 가장 빈번한 스코어라인 = 예측 점수
+    # 예측 점수: 상위 5개 스코어라인에서 확률 가중 샘플링
+    # (항상 최빈값만 선택하면 1-0이 과도하게 나타나므로 다양성 확보)
     scorelines = Counter(zip(home_goals_sim.tolist(), away_goals_sim.tolist()))
-    predicted_home, predicted_away = scorelines.most_common(1)[0][0]
-    top_count = scorelines.most_common(1)[0][1]
+    top5 = scorelines.most_common(5)
+    top5_scores = [s for s, _ in top5]
+    top5_counts = np.array([c for _, c in top5], dtype=float)
+    # 제곱근으로 부드럽게 가중치 (1위에 너무 편중되지 않게)
+    top5_weights = np.sqrt(top5_counts)
+    top5_weights /= top5_weights.sum()
+    chosen_idx = int(rng.choice(len(top5_scores), p=top5_weights))
+    predicted_home, predicted_away = top5_scores[chosen_idx]
+    top_count = top5_counts[0]  # 신뢰도 계산은 여전히 1위 빈도 기준
 
     # 신뢰도: 예측 스코어가 얼마나 지배적인지 (0.0 ~ 1.0)
     confidence = round(min(1.0, (top_count / SIMULATIONS) * 5), 2)
