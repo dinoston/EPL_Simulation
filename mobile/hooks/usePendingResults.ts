@@ -23,15 +23,21 @@ export function usePendingResults() {
       const timeoutId = setTimeout(async () => {
         try {
           const result = await fetchMatchResult(pred.fixtureId);
-          if (result.status === 'FINISHED' && result.score) {
+          const s = result.score;
+          if (
+            result.status === 'FINISHED' &&
+            s != null &&
+            typeof s.home === 'number' &&
+            typeof s.away === 'number'
+          ) {
             const bonus = calcAccuracyBonus(
               pred.predictedHome,
               pred.predictedAway,
-              result.score.home,
-              result.score.away,
+              s.home,
+              s.away,
               pred.isCritical ?? false,
             );
-            await resolvePrediction(pred.fixtureId, result.score, bonus);
+            await resolvePrediction(pred.fixtureId, s, bonus);
           }
         } catch {
           // ignore — will retry next session

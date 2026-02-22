@@ -201,7 +201,7 @@ function PredictionCard({ p }: { p: SavedPrediction }) {
           <Text style={pcStyles.arrowText}>VS</Text>
         </View>
 
-        {p.resolved && p.realScore ? (
+        {p.resolved && p.realScore != null ? (
           <View style={[
             pcStyles.scoreBlock,
             isExact ? pcStyles.exactBox : isCorrect ? pcStyles.correctBox : pcStyles.wrongBox,
@@ -217,14 +217,14 @@ function PredictionCard({ p }: { p: SavedPrediction }) {
         ) : (
           <View style={pcStyles.pendingBlock}>
             <Text style={pcStyles.pendingIcon}>⏳</Text>
-            <Text style={pcStyles.pendingLabel}>Pending</Text>
+            <Text style={pcStyles.pendingLabel}>Not played yet</Text>
           </View>
         )}
       </View>
 
       {/* Accuracy badge + date */}
       <View style={pcStyles.footer}>
-        {p.resolved ? (
+        {p.resolved && p.realScore != null ? (
           <Text style={[
             pcStyles.resultText,
             isExact ? pcStyles.exactText : isCorrect ? pcStyles.correctText : pcStyles.wrongText,
@@ -232,7 +232,7 @@ function PredictionCard({ p }: { p: SavedPrediction }) {
             {isExact ? '✅ Exact score!' : isCorrect ? '✓ Correct result' : '✗ Wrong result'}
           </Text>
         ) : (
-          <Text style={pcStyles.pendingResultText}>Points awarded after real match</Text>
+          <Text style={pcStyles.pendingResultText}>Waiting for real result</Text>
         )}
         <Text style={pcStyles.dateText}>
           {new Date(p.timestamp).toLocaleDateString('en-US', {
