@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -16,7 +15,6 @@ import { useAdMob } from '../../hooks/useAdMob';
 import { useUserStats } from '../../hooks/useUserStats';
 import { getLevel, LEVEL_ICONS } from '../../types/user';
 import { COLORS } from '../../constants/config';
-import { fetchSquads, type Player, type SquadsResponse } from '../../services/api';
 import type { MatchEvent } from '../../types/prediction';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -46,17 +44,6 @@ export default function SimulationScreen() {
   const [selectedRedCard, setSelectedRedCard] = useState<RedCardTeam>('none');
   const [appliedRedCard, setAppliedRedCard] = useState<RedCardTeam>('none');
 
-  // Key player state
-  const [squads, setSquads] = useState<SquadsResponse | null>(null);
-  const [squadLoading, setSquadLoading] = useState(false);
-  const [showSquadFor, setShowSquadFor] = useState<'home' | 'away' | null>(null);
-  const [keyPlayerPick, setKeyPlayerPick] = useState<{
-    id: number;
-    name: string;
-    team: 'home' | 'away';
-  } | null>(null);
-  const [bestPlayer, setBestPlayer] = useState<{ name: string; id: number } | null>(null);
-  const [keyPlayerResult, setKeyPlayerResult] = useState<'correct' | 'wrong' | null>(null);
   const [replayCount, setReplayCount] = useState(0); // max 1 replay allowed
 
   const { prediction, loading } = usePrediction(
@@ -87,49 +74,6 @@ export default function SimulationScreen() {
   const startTimeRef = useRef(0);
   const finalHomeScore = useRef(0);
   const finalAwayScore = useRef(0);
-
-  // ── Squad loading ──────────────────────────────────────────────────────────
-  async function loadSquads() {
-    if (squads || squadLoading) return;
-    setSquadLoading(true);
-    try {
-      const result = await fetchSquads(
-        Number(params.homeTeamId),
-        Number(params.awayTeamId),
-      );
-      setSquads(result);
-    } catch {
-      // fail silently – key player section becomes unavailable
-    } finally {
-      setSquadLoading(false);
-    }
-  }
-
-  // ── Determine best player after simulation finishes ───────────────────────
-  useEffect(() => {
-    if (!simFinished || !squads) return;
-
-    let pool: Player[];
-    const hScore = finalHomeScore.current;
-    const aScore = finalAwayScore.current;
-    if (hScore > aScore) pool = squads.home;
-    else if (aScore > hScore) pool = squads.away;
-    else pool = [...squads.home, ...squads.away];
-
-    if (pool.length === 0) return;
-    const best = pool[Math.floor(Math.random() * pool.length)];
-    setBestPlayer({ name: best.name, id: best.id });
-
-    if (keyPlayerPick) {
-      if (keyPlayerPick.id === best.id) {
-        setKeyPlayerResult('correct');
-        addPoints(50);
-      } else {
-        setKeyPlayerResult('wrong');
-        addPoints(-10);
-      }
-    }
-  }, [simFinished, squads]);
 
   function beginSimulation() {
     if (!prediction) return;
@@ -240,10 +184,6 @@ export default function SimulationScreen() {
     setSelectedRedCard('none');
     setAppliedRedCard('none');
     setPredSaved(false);
-    setKeyPlayerPick(null);
-    setShowSquadFor(null);
-    setBestPlayer(null);
-    setKeyPlayerResult(null);
     setReplayCount((c) => c + 1);
   }
 
@@ -272,29 +212,8 @@ export default function SimulationScreen() {
       points: pts,
       timestamp: new Date().toISOString(),
       isCritical: prediction.is_critical ?? false,
-      keyPlayer: keyPlayerPick
-        ? { name: keyPlayerPick.name, team: keyPlayerPick.team }
-        : undefined,
     });
     setPredSaved(true);
-  }
-
-  function handleSquadTeamPress(team: 'home' | 'away') {
-    if (showSquadFor === team) {
-      setShowSquadFor(null);
-    } else {
-      setShowSquadFor(team);
-      loadSquads();
-    }
-  }
-
-  function handlePlayerPick(player: Player, team: 'home' | 'away') {
-    setKeyPlayerPick(
-      keyPlayerPick?.id === player.id
-        ? null
-        : { id: player.id, name: player.name, team },
-    );
-    setShowSquadFor(null);
   }
 
   if (loading) {
@@ -422,92 +341,6 @@ export default function SimulationScreen() {
               </View>
             </View>
 
-            {/* ── Key Player Pick ───────────────────────────────────────── */}
-            <View style={styles.keyPlayerSection}>
-              <Text style={styles.keyPlayerTitle}>⭐ Key Player Pick</Text>
-              <Text style={styles.keyPlayerSub}>Who will be rated highest?</Text>
-
-              <View style={styles.keyTeamRow}>
-                <TouchableOpacity
-                  style={[styles.keyTeamBtn, showSquadFor === 'home' && styles.keyTeamBtnActive]}
-                  onPress={() => handleSquadTeamPress('home')}
-                >
-                  <Text style={[styles.keyTeamBtnText, showSquadFor === 'home' && styles.keyTeamBtnTextActive]}>
-                    {params.homeName}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.keyTeamBtn, showSquadFor === 'away' && styles.keyTeamBtnActive]}
-                  onPress={() => handleSquadTeamPress('away')}
-                >
-                  <Text style={[styles.keyTeamBtnText, showSquadFor === 'away' && styles.keyTeamBtnTextActive]}>
-                    {params.awayName}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {squadLoading && (
-                <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 8 }} />
-              )}
-
-              {/* Player list */}
-              {showSquadFor && squads && (() => {
-                const squad = showSquadFor === 'home' ? squads.home : squads.away;
-                const positions = ['Goalkeeper', 'Defender', 'Midfielder', 'Forward'] as const;
-                return (
-                  <View style={styles.playerList}>
-                    {positions.map((pos) => {
-                      const group = squad.filter((p) => p.position === pos);
-                      if (group.length === 0) return null;
-                      const label = pos === 'Goalkeeper' ? 'Goalkeepers' : `${pos}s`;
-                      return (
-                        <View key={pos}>
-                          <Text style={styles.posHeader}>{label}</Text>
-                          {group.map((player) => (
-                            <TouchableOpacity
-                              key={player.id}
-                              style={[
-                                styles.playerRow,
-                                keyPlayerPick?.id === player.id && styles.playerRowSelected,
-                              ]}
-                              onPress={() => handlePlayerPick(player, showSquadFor)}
-                            >
-                              <Text style={[
-                                styles.playerName,
-                                keyPlayerPick?.id === player.id && styles.playerNameSelected,
-                              ]}>
-                                {player.name}
-                              </Text>
-                              {keyPlayerPick?.id === player.id && (
-                                <Text style={styles.playerCheck}>✓</Text>
-                              )}
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      );
-                    })}
-                  </View>
-                );
-              })()}
-
-              {/* No squad data */}
-              {showSquadFor && !squads && !squadLoading && (
-                <Text style={styles.keyPlayerSub}>Could not load squad data.</Text>
-              )}
-
-              {/* Selected player chip */}
-              {keyPlayerPick && (
-                <View style={styles.keyPlayerSelected}>
-                  <Text style={styles.keyPlayerSelectedText}>
-                    ⭐ {keyPlayerPick.name} · {keyPlayerPick.team === 'home' ? params.homeName : params.awayName}
-                  </Text>
-                  <TouchableOpacity onPress={() => setKeyPlayerPick(null)}>
-                    <Text style={styles.keyPlayerClear}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-
             {/* Normal and Red Card simulation buttons */}
             <View style={styles.simBtnRow}>
               <TouchableOpacity style={styles.normalSimBtn} onPress={handleStartNormal}>
@@ -574,23 +407,6 @@ export default function SimulationScreen() {
                 ? `🏆 ${params.awayName} Win`
                 : '🤝 Draw'}
             </Text>
-
-            {/* Key player result */}
-            {bestPlayer && (
-              <View style={styles.bestPlayerSection}>
-                <Text style={styles.bestPlayerTitle}>⭐ Best Player of the Match</Text>
-                <Text style={styles.bestPlayerName}>{bestPlayer.name}</Text>
-                {keyPlayerResult === 'correct' ? (
-                  <View style={[styles.keyResultBadge, styles.keyResultCorrect]}>
-                    <Text style={styles.keyResultText}>🎯 Perfect pick! +50 pts</Text>
-                  </View>
-                ) : keyPlayerResult === 'wrong' ? (
-                  <View style={[styles.keyResultBadge, styles.keyResultWrong]}>
-                    <Text style={styles.keyResultText}>❌ Wrong pick · -10 pts</Text>
-                  </View>
-                ) : null}
-              </View>
-            )}
 
             {/* Save prediction */}
             {!predSaved ? (
